@@ -12,6 +12,7 @@ import { useWiresGraphStore } from '@/stores/wiresGraph'
 import { useMetadataStore } from '@/stores/metadata'
 import { getSnapshot, putSnapshot, deleteGraph } from '@/api/wireGraph'
 import { getConfigsByPids } from '@/api/metadata'
+import { getAssetConfiguration } from '@/api/driversAssets'
 import {
   extractGraphSnapshot,
   flattenComponentProperties,
@@ -20,6 +21,7 @@ import {
 } from '@/api/wireGraphCodec'
 import { hasCycle } from '@/composables/useGraphValidation'
 import type { Point } from '@/composables/canvas'
+import { WIRE_ASSET_FACTORY_PID } from '@/types/driversAssets'
 import type { ComponentDescriptor, WireGraphSnapshot } from '@/types/wires'
 
 function errMsg(error: unknown): string {
@@ -188,16 +190,33 @@ export function useSnapshot() {
 
   /**
    * 新建组件：端口数/默认属性取自 metadata（对照上游 fillRenderingProperties）。
-   * `pid` 用于「把已存在的资产拖进图里」——此时必须复用它的 PID，不能另起名字。
+   * `pid` 用于「把已存在的资产拖进图里」——此时必须复用它的 PID，不能另起名字；
+   * 资产还要读取它已保存的配置，否则保存整图会把通道表与 driver.pid 冲回 OCD 默认值。
+   *
+   * @param descriptor 组件定义
+   * @param position 画布位置
+   * @param pid 已存在的实例 PID（可选）
    */
-  function createComponent(descriptor: ComponentDescriptor, position: Point, pid?: string): void {
+  async function createComponent(
+    descriptor: ComponentDescriptor,
+    position: Point,
+    pid?: string,
+  ): Promise<void> {
+    let properties = metadata.defaultProperties(descriptor)
+    if (pid && descriptor.factoryPid === WIRE_ASSET_FACTORY_PID) {
+      try {
+        properties = { ...properties, ...(await getAssetConfiguration(pid)) }
+      } catch (error) {
+        ElMessage.warning(t('wires.messages.assetConfigLoadFailed', { msg: errMsg(error) }))
+      }
+    }
     store.addComponent({
       pid: pid ?? nextPid(descriptor),
       factoryPid: descriptor.factoryPid,
       inputPortCount: descriptor.defaultInputPorts,
       outputPortCount: descriptor.defaultOutputPorts,
       position,
-      properties: metadata.defaultProperties(descriptor),
+      properties,
     })
   }
 

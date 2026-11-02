@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   putSnapshot: vi.fn(),
   deleteGraph: vi.fn(),
   getConfigsByPids: vi.fn(),
+  getAssetConfiguration: vi.fn(),
   error: vi.fn(),
   success: vi.fn(),
   warning: vi.fn(),
@@ -27,6 +28,10 @@ vi.mock('@/api/wireGraph', () => ({
   getSnapshot: mocks.getSnapshot,
   putSnapshot: mocks.putSnapshot,
   deleteGraph: mocks.deleteGraph,
+}))
+
+vi.mock('@/api/driversAssets', () => ({
+  getAssetConfiguration: mocks.getAssetConfiguration,
 }))
 
 vi.mock('@/api/metadata', () => ({
@@ -57,7 +62,11 @@ interface SnapshotApi {
   load: () => Promise<void>
   deleteAll: () => Promise<void>
   exportJson: () => void
-  createComponent: (descriptor: ComponentDescriptor, position: { x: number; y: number }) => void
+  createComponent: (
+    descriptor: ComponentDescriptor,
+    position: { x: number; y: number },
+    pid?: string,
+  ) => Promise<void>
 }
 
 const Host = defineComponent({
@@ -332,6 +341,64 @@ describe('useSnapshot', () => {
     expect(store.components[0]?.properties).toEqual({ type: 'SIMPLE' })
     expect(store.components[0]?.inputPortCount).toBe(0)
     expect(store.components[1]?.outputPortCount).toBe(1)
+  })
+
+  it('thenLoadsSavedAssetConfigurationWhenDroppingAnExistingAsset', async () => {
+    mocks.getAssetConfiguration.mockResolvedValue({
+      'driver.pid': 'driver1',
+      'asset.desc': 'boiler',
+      'temperature#+type': 'READ',
+      'temperature#+value.type': 'DOUBLE',
+    })
+    const store = useWiresGraphStore()
+    const descriptor = {
+      factoryPid: 'org.eclipse.kura.wire.WireAsset',
+      name: 'WireAsset',
+      minInputPorts: 1,
+      maxInputPorts: 1,
+      defaultInputPorts: 1,
+      minOutputPorts: 1,
+      maxOutputPorts: 1,
+      defaultOutputPorts: 1,
+      properties: [],
+    }
+
+    await api().createComponent(descriptor, { x: 0, y: 0 }, 'asset1')
+
+    expect(mocks.getAssetConfiguration).toHaveBeenCalledWith('asset1')
+    expect(store.components[0]?.pid).toBe('asset1')
+    expect(store.components[0]?.properties['driver.pid']).toBe('driver1')
+    expect(store.components[0]?.properties['temperature#+value.type']).toBe('DOUBLE')
+  })
+
+  it('thenFallsBackToDefaultsWhenAssetConfigurationCannotBeLoaded', async () => {
+    mocks.getAssetConfiguration.mockRejectedValue(new Error('404'))
+    const store = useWiresGraphStore()
+    const descriptor = {
+      factoryPid: 'org.eclipse.kura.wire.WireAsset',
+      name: 'WireAsset',
+      minInputPorts: 1,
+      maxInputPorts: 1,
+      defaultInputPorts: 1,
+      minOutputPorts: 1,
+      maxOutputPorts: 1,
+      defaultOutputPorts: 1,
+      properties: [
+        {
+          id: 'emit.errors',
+          name: 'emit.errors',
+          type: 'BOOLEAN' as const,
+          required: true,
+          cardinality: 0,
+          defaultValue: 'false',
+        },
+      ],
+    }
+
+    await api().createComponent(descriptor, { x: 0, y: 0 }, 'asset1')
+
+    expect(store.components[0]?.properties).toEqual({ 'emit.errors': 'false' })
+    expect(mocks.warning).toHaveBeenCalledWith(expect.stringContaining('404'))
   })
 
   it('thenReportsImportFailureForBrokenJson', async () => {

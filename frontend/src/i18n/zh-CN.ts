@@ -42,6 +42,15 @@ export default {
       invalid: '存在非法字段，无法应用',
       applySuccess: '配置已应用',
       noFields: '该组件没有可配置属性',
+      assetTab: '资产配置',
+      driverTab: 'Driver - {pid}',
+      driverSelect: 'Driver',
+      driverNone: '未绑定 Driver',
+      driverRequired: '请先选择一个 Driver',
+      channelsInvalid: '通道表存在非法项，无法应用',
+      assetLoadFailed: '资产配置加载失败：{msg}',
+      driverLoadFailed: 'Driver 配置加载失败：{msg}',
+      driverApplySuccess: 'Driver 配置已应用',
     },
     /**
      * 组件目录文案：后端 GET /metadata 只返回英文 metatype 文案（name / description / options），
@@ -200,6 +209,7 @@ export default {
       factoryPidMissing: '组件缺少 factoryPid，无法保存（快照可能来自异构环境）',
     },
     messages: {
+      assetConfigLoadFailed: '无法读取资产配置，已使用默认值：{msg}',
       nodeAlreadyInGraph: '该组件已在图里：{pid}',
       saveSuccess: '保存成功',
       loadSuccess: '加载成功',

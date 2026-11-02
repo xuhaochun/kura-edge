@@ -9,9 +9,11 @@ import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import ValidationInput from './ValidationInput.vue'
+import WireAssetConfiguration from './WireAssetConfiguration.vue'
 import { useComponentConfigStore } from '@/stores/componentConfig'
 import { useWiresGraphStore } from '@/stores/wiresGraph'
 import { useMetadataText } from '@/composables/useMetadataText'
+import { WIRE_ASSET_FACTORY_PID } from '@/types/driversAssets'
 import type { ConfigParameter } from '@/types/wires'
 
 const graph = useWiresGraphStore()
@@ -21,6 +23,9 @@ const { propertyLabel, propertyDescription } = useMetadataText()
 
 /** 字段所属组件的 factoryPid：字段文案按组件查 i18n 表 */
 const factoryPid = computed(() => config.component?.factoryPid ?? '')
+
+/** 资产使用专用配置区（通道表 + Driver 页签），普通组件仍走扁平 OCD 表单 */
+const isAsset = computed(() => factoryPid.value === WIRE_ASSET_FACTORY_PID)
 
 /** 字段标签：中文名，未登记翻译时回落后端 metatype 名 */
 function paramLabel(param: ConfigParameter): string {
@@ -62,37 +67,40 @@ function apply(): void {
     <div class="config-area__title">{{ $t('wires.config.title') }}</div>
     <el-empty v-if="!config.component" :description="$t('wires.config.none')" :image-size="60" />
     <template v-else>
-      <div class="config-area__pid">{{ config.component.pid }}</div>
-      <p v-if="config.parameters.length === 0" class="config-area__no-fields">
-        {{ $t('wires.config.noFields') }}
-      </p>
-      <el-form v-else label-position="top" size="small" @submit.prevent>
-        <el-form-item
-          v-for="param in config.parameters"
-          :key="param.id"
-          :required="param.required"
-          :error="fieldError(param.id)"
-        >
-          <template #label>
-            <span class="config-area__param" :title="paramDescription(param)">
-              <span class="config-area__param-name">{{ paramLabel(param) }}</span>
-              <!-- 中文名与原 metatype 属性 id 不一时并列展示 id：配置项与上游文档仍需能对上 -->
-              <span v-if="paramLabel(param) !== param.id" class="config-area__param-id">
-                {{ param.id }}
+      <WireAssetConfiguration v-if="isAsset" :pid="config.component.pid" />
+      <template v-else>
+        <div class="config-area__pid">{{ config.component.pid }}</div>
+        <p v-if="config.parameters.length === 0" class="config-area__no-fields">
+          {{ $t('wires.config.noFields') }}
+        </p>
+        <el-form v-else label-position="top" size="small" @submit.prevent>
+          <el-form-item
+            v-for="param in config.parameters"
+            :key="param.id"
+            :required="param.required"
+            :error="fieldError(param.id)"
+          >
+            <template #label>
+              <span class="config-area__param" :title="paramDescription(param)">
+                <span class="config-area__param-name">{{ paramLabel(param) }}</span>
+                <!-- 中文名与原 metatype 属性 id 不一时并列展示 id：配置项与上游文档仍需能对上 -->
+                <span v-if="paramLabel(param) !== param.id" class="config-area__param-id">
+                  {{ param.id }}
+                </span>
               </span>
-            </span>
-          </template>
-          <ValidationInput
-            :param="param"
-            :model-value="config.values[param.id] ?? ''"
-            :invalid="config.results[param.id]?.valid === false"
-            @update:model-value="config.setValue(param.id, $event)"
-          />
-        </el-form-item>
-        <el-button type="primary" size="small" @click="apply">
-          {{ $t('wires.config.apply') }}
-        </el-button>
-      </el-form>
+            </template>
+            <ValidationInput
+              :param="param"
+              :model-value="config.values[param.id] ?? ''"
+              :invalid="config.results[param.id]?.valid === false"
+              @update:model-value="config.setValue(param.id, $event)"
+            />
+          </el-form-item>
+          <el-button type="primary" size="small" @click="apply">
+            {{ $t('wires.config.apply') }}
+          </el-button>
+        </el-form>
+      </template>
     </template>
   </div>
 </template>

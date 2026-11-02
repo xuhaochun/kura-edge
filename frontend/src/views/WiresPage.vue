@@ -40,7 +40,7 @@ function confirmThen(messageKey: string, action: () => void): void {
 /** 面板点击新建：位置按现有组件数错开（store 内部再做网格吸附） */
 function onPaletteCreate(payload: { descriptor: ComponentDescriptor; pid?: string }): void {
   const offset = store.components.length
-  addNode(payload.descriptor, payload.pid, {
+  void addNode(payload.descriptor, payload.pid, {
     x: 80 + (offset % 5) * 160,
     y: 80 + Math.floor(offset / 5) * 120,
   })
@@ -55,7 +55,7 @@ function onDropCreate(payload: {
     (candidate) => candidate.factoryPid === payload.factoryPid,
   )
   if (descriptor) {
-    addNode(descriptor, payload.pid, payload.position)
+    void addNode(descriptor, payload.pid, payload.position)
   }
 }
 
@@ -63,16 +63,16 @@ function onDropCreate(payload: {
  * 加节点：带 pid 的（面板块里的已有资产）复用该 pid —— 同一资产不能重复入图，
  * 重复时给提示而不是悄悄加第二个节点（保存时后端会因重复 pid 报错）。
  */
-function addNode(
+async function addNode(
   descriptor: ComponentDescriptor,
   pid: string | undefined,
   position: Position,
-): void {
+): Promise<void> {
   if (pid && store.components.some((component) => component.pid === pid)) {
     ElMessage.warning(t('wires.messages.nodeAlreadyInGraph', { pid }))
     return
   }
-  createComponent(descriptor, position, pid)
+  await createComponent(descriptor, position, pid)
 }
 
 function onDeleteComponent(): void {
@@ -232,7 +232,7 @@ onBeforeRouteLeave(async () => {
 }
 
 .wires-page__right {
-  width: 320px;
+  width: 460px;
   flex-shrink: 0;
 }
 </style>
