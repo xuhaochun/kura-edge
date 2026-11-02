@@ -1,0 +1,96 @@
+{
+  "components": [
+    {
+      "pid": "TimerFast",
+      "inputPortCount": 0,
+      "outputPortCount": 1,
+      "renderingProperties": {
+        "position": {
+          "x": 80,
+          "y": 80
+        }
+      }
+    },
+    {
+      "pid": "FifoQueue",
+      "inputPortCount": 1,
+      "outputPortCount": 1,
+      "renderingProperties": {
+        "position": {
+          "x": 360,
+          "y": 80
+        }
+      }
+    },
+    {
+      "pid": "CloudPublisherOut",
+      "inputPortCount": 1,
+      "outputPortCount": 1,
+      "renderingProperties": {
+        "position": {
+          "x": 640,
+          "y": 80
+        }
+      }
+    },
+    {
+      "pid": "TimerTick",
+      "inputPortCount": 0,
+      "outputPortCount": 1,
+      "renderingProperties": {
+        "position": {
+          "x": 80,
+          "y": 240
+        }
+      }
+    },
+    {
+      "pid": "TimerKeyFilter",
+      "inputPortCount": 1,
+      "outputPortCount": 1,
+      "renderingProperties": {
+        "position": {
+          "x": 360,
+          "y": 240
+        }
+      }
+    },
+    {
+      "pid": "LoggerSink",
+      "inputPortCount": 1,
+      "outputPortCount": 0,
+      "renderingProperties": {
+        "position": {
+          "x": 640,
+          "y": 240
+        }
+      }
+    }
+  ],
+  "wires": [
+    {
+      "emitter": "TimerFast",
+      "emitterPort": 0,
+      "receiver": "FifoQueue",
+      "receiverPort": 0
+    },
+    {
+      "emitter": "FifoQueue",
+      "emitterPort": 0,
+      "receiver": "CloudPublisherOut",
+      "receiverPort": 0
+    },
+    {
+      "emitter": "TimerTick",
+      "emitterPort": 0,
+      "receiver": "TimerKeyFilter",
+      "receiverPort": 0
+    },
+    {
+      "emitter": "TimerKeyFilter",
+      "emitterPort": 0,
+      "receiver": "LoggerSink",
+      "receiverPort": 0
+    }
+  ]
+}

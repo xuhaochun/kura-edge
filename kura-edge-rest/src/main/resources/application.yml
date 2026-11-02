@@ -1,0 +1,32 @@
+# kura-edge 后端配置。密钥/口令只放占位符，由环境变量注入（Rules 05 §11）。
+server:
+  port: 8080
+
+spring:
+  application:
+    name: kura-edge
+  datasource:
+    url: jdbc:h2:mem:kuraedge;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+
+kura:
+  security:
+    admin:
+      username: admin
+      # 仅占位符：生产环境必须通过 KURA_EDGE_ADMIN_PASSWORD 覆盖
+      password: ${KURA_EDGE_ADMIN_PASSWORD:changeme}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

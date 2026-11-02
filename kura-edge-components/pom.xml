@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.kura</groupId>
+        <artifactId>kura-edge</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>kura-edge-components</artifactId>
+    <name>kura-edge-components</name>
+    <description>内置 Wire 组件：Timer、Logger、RegexFilter、Fifo、CloudPublisher、CloudSubscriber、DbStore、WireAsset</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.kura</groupId>
+            <artifactId>kura-edge-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.kura</groupId>
+            <artifactId>kura-edge-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <!-- DbWireRecordStore 落库依赖（版本由父 dependencyManagement 的 spring-boot-dependencies 管理） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

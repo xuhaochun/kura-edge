@@ -1,0 +1,143 @@
+{
+  "configs": [
+    {
+      "pid": "org.eclipse.kura.wire.graph.WireGraphService",
+      "properties": {
+        "WireGraph": {
+          "type": "STRING",
+          "value": "{\n  \"components\": [\n    {\n      \"pid\": \"TimerFast\",\n      \"inputPortCount\": 0,\n      \"outputPortCount\": 1,\n      \"renderingProperties\": {\n        \"position\": {\n          \"x\": 80,\n          \"y\": 80\n        }\n      }\n    },\n    {\n      \"pid\": \"FifoQueue\",\n      \"inputPortCount\": 1,\n      \"outputPortCount\": 1,\n      \"renderingProperties\": {\n        \"position\": {\n          \"x\": 360,\n          \"y\": 80\n        }\n      }\n    },\n    {\n      \"pid\": \"CloudPublisherOut\",\n      \"inputPortCount\": 1,\n      \"outputPortCount\": 1,\n      \"renderingProperties\": {\n        \"position\": {\n          \"x\": 640,\n          \"y\": 80\n        }\n      }\n    },\n    {\n      \"pid\": \"TimerTick\",\n      \"inputPortCount\": 0,\n      \"outputPortCount\": 1,\n      \"renderingProperties\": {\n        \"position\": {\n          \"x\": 80,\n          \"y\": 240\n        }\n      }\n    },\n    {\n      \"pid\": \"TimerKeyFilter\",\n      \"inputPortCount\": 1,\n      \"outputPortCount\": 1,\n      \"renderingProperties\": {\n        \"position\": {\n          \"x\": 360,\n          \"y\": 240\n        }\n      }\n    },\n    {\n      \"pid\": \"LoggerSink\",\n      \"inputPortCount\": 1,\n      \"outputPortCount\": 0,\n      \"renderingProperties\": {\n        \"position\": {\n          \"x\": 640,\n          \"y\": 240\n        }\n      }\n    }\n  ],\n  \"wires\": [\n    {\n      \"emitter\": \"TimerFast\",\n      \"emitterPort\": 0,\n      \"receiver\": \"FifoQueue\",\n      \"receiverPort\": 0\n    },\n    {\n      \"emitter\": \"FifoQueue\",\n      \"emitterPort\": 0,\n      \"receiver\": \"CloudPublisherOut\",\n      \"receiverPort\": 0\n    },\n    {\n      \"emitter\": \"TimerTick\",\n      \"emitterPort\": 0,\n      \"receiver\": \"TimerKeyFilter\",\n      \"receiverPort\": 0\n    },\n    {\n      \"emitter\": \"TimerKeyFilter\",\n      \"emitterPort\": 0,\n      \"receiver\": \"LoggerSink\",\n      \"receiverPort\": 0\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "pid": "TimerFast",
+      "properties": {
+        "service.factoryPid": {
+          "type": "STRING",
+          "value": "org.eclipse.kura.wire.Timer"
+        },
+        "type": {
+          "type": "STRING",
+          "value": "SIMPLE"
+        },
+        "simple.interval": {
+          "type": "INTEGER",
+          "value": 1
+        },
+        "simple.time.unit": {
+          "type": "STRING",
+          "value": "SECONDS"
+        },
+        "simple.first.tick.policy": {
+          "type": "STRING",
+          "value": "DEFAULT"
+        },
+        "simple.custom.first.tick.interval": {
+          "type": "INTEGER",
+          "value": 0
+        },
+        "cron.interval": {
+          "type": "STRING",
+          "value": "0/10 * * * * ?"
+        }
+      }
+    },
+    {
+      "pid": "FifoQueue",
+      "properties": {
+        "service.factoryPid": {
+          "type": "STRING",
+          "value": "org.eclipse.kura.wire.Fifo"
+        },
+        "queue.capacity": {
+          "type": "INTEGER",
+          "value": 100
+        },
+        "discard.envelopes": {
+          "type": "BOOLEAN",
+          "value": false
+        }
+      }
+    },
+    {
+      "pid": "CloudPublisherOut",
+      "properties": {
+        "service.factoryPid": {
+          "type": "STRING",
+          "value": "org.eclipse.kura.wire.CloudPublisher"
+        },
+        "CloudPublisher.target": {
+          "type": "STRING",
+          "value": "(kura.service.pid=changeme)"
+        },
+        "publish.forward": {
+          "type": "BOOLEAN",
+          "value": true
+        }
+      }
+    },
+    {
+      "pid": "TimerTick",
+      "properties": {
+        "service.factoryPid": {
+          "type": "STRING",
+          "value": "org.eclipse.kura.wire.Timer"
+        },
+        "type": {
+          "type": "STRING",
+          "value": "SIMPLE"
+        },
+        "simple.interval": {
+          "type": "INTEGER",
+          "value": 5
+        },
+        "simple.time.unit": {
+          "type": "STRING",
+          "value": "SECONDS"
+        },
+        "simple.first.tick.policy": {
+          "type": "STRING",
+          "value": "DEFAULT"
+        },
+        "simple.custom.first.tick.interval": {
+          "type": "INTEGER",
+          "value": 0
+        },
+        "cron.interval": {
+          "type": "STRING",
+          "value": "0/10 * * * * ?"
+        }
+      }
+    },
+    {
+      "pid": "TimerKeyFilter",
+      "properties": {
+        "service.factoryPid": {
+          "type": "STRING",
+          "value": "org.eclipse.kura.wire.RegexFilter"
+        },
+        "regex.filter": {
+          "type": "STRING",
+          "value": "TIMER"
+        },
+        "filter.type": {
+          "type": "INTEGER",
+          "value": 1
+        }
+      }
+    },
+    {
+      "pid": "LoggerSink",
+      "properties": {
+        "service.factoryPid": {
+          "type": "STRING",
+          "value": "org.eclipse.kura.wire.Logger"
+        },
+        "log.verbosity": {
+          "type": "STRING",
+          "value": "VERBOSE"
+        }
+      }
+    }
+  ]
+}
