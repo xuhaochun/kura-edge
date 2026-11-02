@@ -10,11 +10,11 @@
 | 问题 | 答案 | 位置 |
 |---|---|---|
 | Asset 是什么？ | 一个 `WireAsset` 组件实例：`driver.pid` + 一组具名通道 | `kura-edge-components/.../asset/WireAsset.java` |
-| Driver 是什么？ | 协议适配器（本项目只内置模拟驱动），工厂 PID `org.eclipse.kura.driver.simulated` | `kura-edge-components/.../driver/simulated/SimulatedDriverFactory.java` |
+| Driver 是什么？ | 协议适配器（内置模拟驱动 + Modbus 主站驱动），工厂 PID 分别为 `org.eclipse.kura.driver.simulated` 与 `org.eclipse.kura.driver.modbus` | `kura-edge-components/.../driver/simulated/SimulatedDriverFactory.java`、`.../driver/modbus/ModbusDriverFactory.java` |
 | 资产/驱动的配置存在哪？ | 与所有组件一样存在 `component_configuration` 表（属性 JSON，键名与 Kura 快照一致） | `kura-edge-core/.../config/ComponentConfigurationServiceImpl.java` |
 | 谁创建资产实例？ | `AssetServiceImpl`（`@PostConstruct` 恢复 + 页面创建时立即建），**不是**线图 | `kura-edge-core/.../asset/AssetServiceImpl.java` |
 | 资产能进线图吗？ | 能，`factoryPid = org.eclipse.kura.wire.WireAsset`，与上游一致；进图时复用同一实例 | `WireComponentRegistry#reuseCandidate` |
-| 值从哪来？ | `SimulatedDriver` 的内存寄存器表（`simulated.register`） | `SimulatedDriver.java` |
+| 值从哪来？ | 模拟驱动：内存寄存器表（`simulated.register`）；Modbus 驱动：真实从站的线圈/寄存器 | `SimulatedDriver.java`、`ModbusDriver.java` |
 
 ---
 
@@ -28,6 +28,7 @@ kura-edge-core       asset（AssetChannelParser/ScaleOffsetApplier/BaseAsset/Ass
                      driver（DriverService）、config（DefinitionDefaults）
 kura-edge-components asset（WireAsset/WireAssetFactory/WireAssetOcd/RecordFillers/ValueChangeCache）
                      driver/simulated（Simulator 驱动）
+                     driver/modbus（官方 Modbus 协议移植：CRC/功能码/TCP 与 RTU-over-TCP/通道编解码）
 kura-edge-rest       DriversAssetsService / AssetDataService + 两个 Controller + DTO
 frontend             views/DriversAssetsPage + components/drivers/* + stores/driversAssets
 ```
@@ -54,6 +55,10 @@ frontend             views/DriversAssetsPage + components/drivers/* + stores/dri
 | `<channel>#+listen` | 是否监听驱动事件（**本轮只存不跑**） |
 | `<channel>#<driverParam>` | 驱动自有参数（不带 `+`），模拟驱动是 `simulated.register` |
 | `emit.all.channels` / `timestamp.mode` / `emit.errors` / `emit.connection.errors` / `emit.on.change` / `emit.empty.envelopes` | WireAsset 的发射选项 |
+| `modbus.object.type` | Modbus 对象：`COIL` / `DISCRETE_INPUT` / `HOLDING_REGISTER` / `INPUT_REGISTER` |
+| `modbus.address` | Modbus 起始地址（0–65535） |
+| `modbus.register.count` | 寄存器/位数量；缺省按 `+value.type` 推导（FLOAT=2、DOUBLE=4、LONG=2、其余=1） |
+| `modbus.data.order` | 多寄存器数值的字节序/字序（`BIG_ENDIAN`/`LITTLE_ENDIAN`/`BIG_ENDIAN_WORD_SWAP`/`LITTLE_ENDIAN_WORD_SWAP`） |
 
 解析规则（`AssetChannelParser`，逐条对标上游）：
 
@@ -115,11 +120,55 @@ DELETE /api/v1/wires/assets/{pid} → 校验线图引用 → 删库 + 销毁实�
 
 错误码：`400001` 参数、`400003` 配置非法、`404001` 不存在、`409003` 被引用、`500003` 通道 IO 失败。
 
+## 5.1 Modbus 驱动（`org.eclipse.kura.driver.modbus`）
+
+驱动实例配置（OCD）：
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `modbus.connection.type` | `TCP/IP` | `TCP/IP`（MBAP）或 `TCP-RTU`（RTU 帧跑在 TCP 上） |
+| `modbus.ip.address` | `127.0.0.1` | 从站/网关地址 |
+| `modbus.tcp.port` | `502` | TCP 端口 |
+| `modbus.unit.id` | `1` | Modbus unit/slave id |
+| `modbus.response.timeout` | `1000` | 连接与响应超时（毫秒） |
+| `modbus.max.retries` | `2` | 超时/IO 失败重试次数 |
+
+通道参数见 §2；驱动按通道的 `+value.type` 把寄存器/位解码成对应的 Java 值，写入是逆过程。
+单条记录失败只标记该条 `FAILURE`；连接/IO 失败抛 `Driver.ConnectionException`，REST 统一为 `500003`。
+重试只针对响应超时与连接/IO 失败；异常响应/CRC/回显不符不重试。Modbus TCP 响应会校验
+MBAP transaction id 与 protocol id（比上游严格），不回显 transaction id 的非标网关会失败。
+
+## 5.2 Wire Graph 里的资产配置区
+
+选中资产时，右侧配置区显示两个页签（对照上游 `ConfigurationAreaUi`）：
+
+1. **资产配置**：资产级字段（`asset.desc`、`emit.*`）+ `driver.pid` 下拉 + 通道表；Apply 写回图 store，
+   随整图保存落库。
+2. **Driver - <pid>**：该驱动的 OCD 表单；Apply 调用 `PUT /api/v1/wires/drivers/{pid}`，后端重建驱动实例。
+
+从组件面板把已有资产拖进图时，前端会先读取 `GET /wires/assets/{pid}/configuration`，用已保存的通道和
+`driver.pid` 初始化画布组件，避免保存整图时把资产配置冲回默认值。
+
 ---
 
-## 6. 本轮明确不做（RFC 002 §6）
+## 6. 本轮明确不做（RFC 002 §6 / RFC 003 §0）
 
 1. `+listen` 驱动事件监听、`emit.on.change` 之外的驱动事件相关行为（配置键与 OCD 已保留）；
 2. CSV 通道下载/上传、列显隐弹窗；
-3. 真实协议驱动（modbus/opcua/gpio）：本地只有模拟驱动；接真实驱动时实现 `Driver` + `DriverFactory` 两个接口即可；
+3. 真实协议驱动的其余部分：本轮只交付 Modbus TCP / RTU-over-TCP 主站；串口 Modbus、ASCII 帧、
+   从站模式、OPC-UA/GPIO 驱动不在本轮（串口需要 OSGi `CommConnection` 或新增本地串口库，无法在 CI 稳定验证）；
 4. 资产的 cloudlet / 云发布。
+
+## 7. 界面截图（Wire Graph 资产配置）
+
+改动前（只有扁平 OCD 表单，`driver.pid` 是自由文本，没有通道表/Driver 页签）：
+
+![改动前](assets/wire-asset-config/before-generic-ocd.png)
+
+改动后资产页签（资产字段 + driver 下拉 + 通道表）：
+
+![改动后：资产页签](assets/wire-asset-config/after-asset-tab.png)
+
+改动后 Driver 页签（Modbus 连接选项）：
+
+![改动后：Driver 页签](assets/wire-asset-config/after-driver-tab.png)

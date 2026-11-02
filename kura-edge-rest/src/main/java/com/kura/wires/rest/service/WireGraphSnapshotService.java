@@ -92,7 +92,7 @@ public class WireGraphSnapshotService {
         for (final WireComponentConfiguration component : graph.getWireComponentConfigurations()) {
             configs.add(this.mapper.toDto(component.getConfiguration(), true));
         }
-        // Driver 配置分组：本项目暂无 Driver 实现，返回前两组即可（对照上游 concat driverConfigs）
+        // 驱动配置由独立端点读写，整图快照只返回图服务与图内组件配置（对照上游 concat driverConfigs 的取舍，见 RFC 003）
         return configs;
     }
 

@@ -5,6 +5,7 @@
 package com.kura.wires.rest;
 
 import com.kura.wires.components.db.DbStoreFactory;
+import com.kura.wires.components.driver.modbus.ModbusDriverFactory;
 import com.kura.wires.components.fifo.FifoFactory;
 import com.kura.wires.components.logger.LoggerFactory;
 import com.kura.wires.components.publisher.CloudPublisherFactory;
@@ -12,6 +13,7 @@ import com.kura.wires.components.regexfilter.RegexFilterFactory;
 import com.kura.wires.components.subscriber.CloudSubscriberFactory;
 import com.kura.wires.components.asset.WireAssetFactory;
 import com.kura.wires.components.timer.TimerFactory;
+import com.kura.wires.core.driver.DriverService;
 import com.kura.wires.core.registry.WireComponentRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +35,9 @@ class KuraEdgeApplicationContextTest {
     @Autowired
     private WireComponentRegistry registry;
 
+    @Autowired
+    private DriverService driverService;
+
     @Test
     void contextStarts() {
         // 上下文启动成功即通过（含 Flyway 迁移、JPA validate、安全装配、图引擎装配）
@@ -46,6 +51,12 @@ class KuraEdgeApplicationContextTest {
                 Integer.class);
 
         assertThat(tables).isEqualTo(3);
+    }
+
+    @Test
+    void modbusDriverFactoryIsRegistered() {
+        assertThat(this.driverService.getDriverFactoryPids()).contains(ModbusDriverFactory.FACTORY_PID,
+                "org.eclipse.kura.driver.simulated");
     }
 
     @Test

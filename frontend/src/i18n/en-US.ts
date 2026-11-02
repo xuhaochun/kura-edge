@@ -42,6 +42,15 @@ export default {
       invalid: 'Some fields are invalid',
       applySuccess: 'Configuration applied',
       noFields: 'This component has no configurable properties',
+      assetTab: 'Asset configuration',
+      driverTab: 'Driver - {pid}',
+      driverSelect: 'Driver',
+      driverNone: 'No driver selected',
+      driverRequired: 'Select a driver first',
+      channelsInvalid: 'Some channel fields are invalid',
+      assetLoadFailed: 'Failed to load asset configuration: {msg}',
+      driverLoadFailed: 'Failed to load driver configuration: {msg}',
+      driverApplySuccess: 'Driver configuration applied',
     },
     dialog: {
       downloadTitle: 'Download wire graph snapshot',
@@ -72,6 +81,7 @@ export default {
       factoryPidMissing: 'Component is missing its factoryPid and cannot be saved',
     },
     messages: {
+      assetConfigLoadFailed: 'Could not load asset configuration, using defaults: {msg}',
       nodeAlreadyInGraph: 'Component already in the graph: {pid}',
       saveSuccess: 'Saved',
       loadSuccess: 'Loaded',
