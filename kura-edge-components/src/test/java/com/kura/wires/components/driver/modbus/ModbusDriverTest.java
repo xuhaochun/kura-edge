@@ -140,6 +140,16 @@ class ModbusDriverTest {
     }
 
     @Test
+    public void exposeIoFailureAsConnectionException() throws Exception {
+        givenServer().withCloseAfterRequest();
+        givenDriver();
+
+        assertThatThrownBy(() -> this.driver.read(List.of(readRecord("x", DataType.INTEGER,
+                channel("HOLDING_REGISTER", 0, null)))))
+                .isInstanceOf(Driver.ConnectionException.class);
+    }
+
+    @Test
     public void exposeConnectionFailureAsDriverException() throws Exception {
         final ModbusTestServer closed = new ModbusTestServer(ModbusTransmissionMode.TCP);
         final int port = closed.port();

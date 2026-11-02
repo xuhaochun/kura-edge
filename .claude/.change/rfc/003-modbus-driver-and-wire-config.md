@@ -88,6 +88,10 @@ driver 中」，模拟驱动已经存在（`simulated`），再做一个是重�
   `FLOAT`/`DOUBLE` 用 IEEE-754。
 - 单条记录协议失败 → 该记录标记 `FAILURE` + 上游异常文案，其余记录继续；连接/IO 失败 →
   抛 `Driver.ConnectionException`，由资产层统一转 500003。
+- 重试只针对传输层失败（响应超时、连接/IO 失败）；异常响应、CRC 不符、回显不符是确定性协议错误，
+  不重试（上游本身不重试，本项目按 §2.1 的 OCD 文案补传输层重试）。
+- Modbus TCP 响应额外校验 MBAP transaction id 与 protocol id（比上游严格，用于拒绝错配响应）；
+  不回显 transaction id 的非标网关会因此失败，这是有意的安全取舍。
 
 ## 3. 前端改动
 

@@ -24,12 +24,12 @@ export function getFactoryPids(): Promise<string[]> {
   }).then((result) => result.pids ?? [])
 }
 
-/** GET /drivers：Driver 实例列表（本项目暂无 Driver 实现，后端返回空列表） */
+/** GET /drivers：Driver 实例列表 */
 export function getDrivers(): Promise<PidAndFactoryPidDto[]> {
   return request<PidAndFactoryPidDto[]>({ url: '/v1/wires/drivers', method: 'get' })
 }
 
-/** GET /assets：Asset 实例列表（本项目暂无 Asset 实现，后端返回空列表） */
+/** GET /assets：Asset 实例列表 */
 export function getAssets(): Promise<PidAndFactoryPidDto[]> {
   return request<PidAndFactoryPidDto[]>({ url: '/v1/wires/assets', method: 'get' })
 }

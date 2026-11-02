@@ -46,6 +46,10 @@ final class ModbusTestServer implements AutoCloseable {
 
     private volatile byte[] lastRequestPdu;
 
+    private volatile boolean shortReads;
+
+    private volatile boolean closeAfterRequest;
+
     ModbusTestServer(final ModbusTransmissionMode mode) throws IOException {
         this.mode = mode;
         this.serverSocket = new ServerSocket(0);
@@ -73,6 +77,16 @@ final class ModbusTestServer implements AutoCloseable {
 
     ModbusTestServer withInputRegister(final int address, final int value) {
         this.inputRegisters.put(address, value);
+        return this;
+    }
+
+    ModbusTestServer withShortReads() {
+        this.shortReads = true;
+        return this;
+    }
+
+    ModbusTestServer withCloseAfterRequest() {
+        this.closeAfterRequest = true;
         return this;
     }
 
@@ -125,6 +139,10 @@ final class ModbusTestServer implements AutoCloseable {
                 final Frame request = readFrame(input);
                 this.requests.incrementAndGet();
                 this.lastRequestPdu = request.pdu();
+                if (this.closeAfterRequest) {
+                    socket.setSoLinger(true, 0);
+                    return;
+                }
                 final byte[] response = handle(request.unit(), request.pdu());
                 writeFrame(output, request, response);
             } catch (final EOFException e) {
@@ -234,11 +252,14 @@ final class ModbusTestServer implements AutoCloseable {
         }
     }
 
-    private static byte[] readBits(final byte[] pdu, final Set<Integer> values, final int function) {
+    private byte[] readBits(final byte[] pdu, final Set<Integer> values, final int function) {
         final int address = address(pdu);
         final int count = count(pdu);
         checkRange(address, count);
         final int byteCount = (count + 7) / 8;
+        if (this.shortReads) {
+            return new byte[] {(byte) function, (byte) byteCount};
+        }
         final byte[] response = new byte[2 + byteCount];
         response[0] = (byte) function;
         response[1] = (byte) byteCount;
@@ -250,10 +271,13 @@ final class ModbusTestServer implements AutoCloseable {
         return response;
     }
 
-    private static byte[] readRegisters(final byte[] pdu, final Map<Integer, Integer> values, final int function) {
+    private byte[] readRegisters(final byte[] pdu, final Map<Integer, Integer> values, final int function) {
         final int address = address(pdu);
         final int count = count(pdu);
         checkRange(address, count);
+        if (this.shortReads) {
+            return new byte[] {(byte) function, (byte) (count * 2)};
+        }
         final byte[] response = new byte[2 + count * 2];
         response[0] = (byte) function;
         response[1] = (byte) (count * 2);

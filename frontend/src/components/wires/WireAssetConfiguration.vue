@@ -88,10 +88,8 @@ const driverTabLabel = computed(() =>
   t('wires.config.driverTab', { pid: driverPid.value === '' ? '?' : driverPid.value }),
 )
 
-const driverLabel = computed(() => {
-  const driver = drivers.value.find((candidate) => candidate.pid === driverPid.value)
-  return driver?.factoryPid ?? ''
-})
+/** 通道表标题用驱动实例 PID（对照上游 channelTableTitle 取 driver.pid） */
+const driverLabel = computed(() => driverPid.value)
 
 const driverDirty = computed(
   () => JSON.stringify(driverValues.value) !== JSON.stringify(driverInitial.value),

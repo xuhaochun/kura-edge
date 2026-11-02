@@ -134,7 +134,9 @@ DELETE /api/v1/wires/assets/{pid} → 校验线图引用 → 删库 + 销毁实�
 | `modbus.max.retries` | `2` | 超时/IO 失败重试次数 |
 
 通道参数见 §2；驱动按通道的 `+value.type` 把寄存器/位解码成对应的 Java 值，写入是逆过程。
-单条记录失败只标记该条 `FAILURE`；连接级失败抛 `Driver.ConnectionException`，REST 统一为 `500003`。
+单条记录失败只标记该条 `FAILURE`；连接/IO 失败抛 `Driver.ConnectionException`，REST 统一为 `500003`。
+重试只针对响应超时与连接/IO 失败；异常响应/CRC/回显不符不重试。Modbus TCP 响应会校验
+MBAP transaction id 与 protocol id（比上游严格），不回显 transaction id 的非标网关会失败。
 
 ## 5.2 Wire Graph 里的资产配置区
 

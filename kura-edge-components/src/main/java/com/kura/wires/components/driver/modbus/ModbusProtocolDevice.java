@@ -348,7 +348,7 @@ public final class ModbusProtocolDevice {
         } catch (final SocketTimeoutException e) {
             throw new ModbusProtocolException(ModbusProtocolErrorCode.RESPONSE_TIMEOUT, "Modbus response timeout", e);
         } catch (final IOException e) {
-            throw new ModbusProtocolException(ModbusProtocolErrorCode.TRANSACTION_FAILURE, "Modbus I/O failure", e);
+            throw new ModbusProtocolException(ModbusProtocolErrorCode.CONNECTION_FAILURE, "Modbus I/O failure", e);
         }
     }
 
@@ -460,6 +460,11 @@ public final class ModbusProtocolDevice {
             throw new ModbusProtocolException(ModbusProtocolErrorCode.INVALID_DATA_TYPE,
                     "Unexpected Modbus function code in response");
         }
+        if (response.length < expectedByteCount + 2) {
+            throw new ModbusProtocolException(ModbusProtocolErrorCode.INVALID_DATA_TYPE,
+                    "Short Modbus read response: expected " + expectedByteCount + " data byte(s), got "
+                            + (response.length - 2));
+        }
         if ((response[1] & 0xff) != expectedByteCount) {
             throw new ModbusProtocolException(ModbusProtocolErrorCode.INVALID_DATA_TYPE,
                     "Unexpected Modbus byte count " + (response[1] & 0xff) + ", expected " + expectedByteCount);
@@ -549,8 +554,8 @@ public final class ModbusProtocolDevice {
     }
 
     private static boolean isRetryable(final ModbusProtocolException e) {
+        // 只重试传输层失败；异常响应/CRC/回显不符属于确定性协议错误，重试只会放大问题
         return e.getCode() == ModbusProtocolErrorCode.RESPONSE_TIMEOUT
-                || e.getCode() == ModbusProtocolErrorCode.TRANSACTION_FAILURE
                 || e.getCode() == ModbusProtocolErrorCode.CONNECTION_FAILURE;
     }
 

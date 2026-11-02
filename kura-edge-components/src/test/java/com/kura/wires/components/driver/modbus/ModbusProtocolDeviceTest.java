@@ -157,6 +157,26 @@ class ModbusProtocolDeviceTest {
     }
 
     @Test
+    public void rejectShortReadResponseBeforeDecoding() throws Exception {
+        givenServer(ModbusTransmissionMode.TCP).withShortReads();
+        givenDevice(ModbusTransmissionMode.TCP);
+
+        assertThatThrownBy(() -> this.device.readHoldingRegisters(1, 0, 1))
+                .isInstanceOf(ModbusProtocolException.class)
+                .hasMessageContaining("Short Modbus read response");
+    }
+
+    @Test
+    public void doNotRetryDeterministicProtocolErrors() throws Exception {
+        givenServer(ModbusTransmissionMode.TCP);
+        givenDevice(ModbusTransmissionMode.TCP, 2);
+
+        assertThatThrownBy(() -> this.device.readHoldingRegisters(1, 9999, 2))
+                .isInstanceOf(ModbusProtocolException.class);
+        assertThat(this.server.requestCount()).isEqualTo(1);
+    }
+
+    @Test
     public void rejectInvalidAddressAndCountLocally() throws Exception {
         givenServer(ModbusTransmissionMode.TCP);
         givenDevice(ModbusTransmissionMode.TCP);
@@ -175,8 +195,14 @@ class ModbusProtocolDeviceTest {
     }
 
     private void givenDevice(final ModbusTransmissionMode mode) throws ModbusProtocolException {
+        givenDevice(mode, 0);
+    }
+
+    private void givenDevice(final ModbusTransmissionMode mode, final int retries) throws ModbusProtocolException {
         this.device = new ModbusProtocolDevice();
-        this.device.configureConnection(connectionConfig(mode, this.server.port()));
+        final Properties config = connectionConfig(mode, this.server.port());
+        config.setProperty("maxRetries", String.valueOf(retries));
+        this.device.configureConnection(config);
     }
 
     private static Properties connectionConfig(final ModbusTransmissionMode mode) {
