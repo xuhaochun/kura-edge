@@ -40,6 +40,17 @@ node_modules/
 frontend/dist/
 *.log
 
+### Desktop (Tauri 2) ###
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+# 构建产物：内嵌 JRE 与后端 jar 由 desktop/scripts/ 生成，不入库；
+# 两个 .gitkeep 必须入库——tauri-build 在编译期要求 bundle.resources 路径存在。
+desktop/src-tauri/resources/app/kura-edge.jar
+desktop/src-tauri/resources/jre/**
+!desktop/src-tauri/resources/jre/.gitkeep
+
 ### Secrets ###
 .env
 .env.*

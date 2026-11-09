@@ -51,6 +51,18 @@ class ArchitectureTest {
             .should().resideInAPackage("com.kura.wires.rest.controller..");
 
     @ArchTest
+    static final ArchRule driverHostStaysOutOfTheApplication = noClasses()
+            .that().resideInAPackage("com.kura.wires.driverhost..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("com.kura.wires.core..", "com.kura.wires.rest..", "com.kura.wires.components..");
+
+    @ArchTest
+    static final ArchRule remoteDriverAdapterStaysInCore = noClasses()
+            .that().resideInAPackage("com.kura.wires.core.driver.remote..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("com.kura.wires.rest..", "com.kura.wires.components..");
+
+    @ArchTest
     static final ArchRule restMustNotTouchRepositoriesDirectly = noClasses()
             .that().resideInAPackage("com.kura.wires.rest..")
             .should().dependOnClassesThat()

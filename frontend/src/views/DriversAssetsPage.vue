@@ -34,9 +34,18 @@ const selectedPid = computed(() => store.selected?.pid ?? '')
 const selectedAsset = computed(() =>
   store.assets.find((asset) => asset.pid === store.selectedAssetPid),
 )
-/** 选中驱动时才能建资产（上游 New Asset 的启用条件） */
-const canCreateAsset = computed(() => store.selected?.kind === 'driver' || store.assets.length > 0)
-const assetDriverPid = computed(() => selectedAsset.value?.driverPid ?? '')
+/** 至少要有一个驱动实例才能建资产（资产必须挂在驱动上） */
+const canCreateAsset = computed(() => store.drivers.length > 0)
+/**
+ * 新建资产弹窗里驱动下拉的默认值：
+ * 选中资产 → 该资产所属驱动；选中驱动 → 该驱动；都没有 → 留空由用户在弹窗里选。
+ */
+const defaultAssetDriverPid = computed(() => {
+  if (selectedAsset.value) {
+    return selectedAsset.value.driverPid
+  }
+  return store.selected?.kind === 'driver' ? selectedPid.value : ''
+})
 
 onMounted(() => {
   void reload()
@@ -77,12 +86,13 @@ function onCreateDriver(payload: { factoryPid: string; pid: string }): void {
     .catch(showError)
 }
 
-function onCreateAsset(payload: { pid: string; description: string }): void {
-  if (!assetDriverPid.value) {
+function onCreateAsset(payload: { pid: string; driverPid: string; description: string }): void {
+  if (!payload.driverPid) {
+    ElMessage.warning(t('driversAssets.validation.driverRequired'))
     return
   }
   void store
-    .addAsset(payload.pid, assetDriverPid.value, payload.description)
+    .addAsset(payload.pid, payload.driverPid, payload.description)
     .then(() => {
       showNewAsset.value = false
       store.reloadChannelRows()
@@ -201,7 +211,12 @@ onBeforeRouteLeave(() => {
     </div>
 
     <NewDriverDialog v-model="showNewDriver" @submit="onCreateDriver" />
-    <NewAssetDialog v-model="showNewAsset" :driver-pid="assetDriverPid" @submit="onCreateAsset" />
+    <NewAssetDialog
+      v-model="showNewAsset"
+      :drivers="store.drivers"
+      :default-driver-pid="defaultAssetDriverPid"
+      @submit="onCreateAsset"
+    />
   </div>
 </template>
 

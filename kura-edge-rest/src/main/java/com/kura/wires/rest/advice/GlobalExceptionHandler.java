@@ -4,6 +4,7 @@
  ******************************************************************************/
 package com.kura.wires.rest.advice;
 
+import com.kura.wires.exception.ErrorCode;
 import com.kura.wires.exception.WiresException;
 import com.kura.wires.rest.dto.ApiResponse;
 import org.slf4j.Logger;
@@ -16,6 +17,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：领域异常、Bean Validation 与兜底异常统一转
@@ -86,6 +89,32 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAuthentication(final AuthenticationException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(401001, "未认证：请使用 HTTP Basic 提供 wires.admin 凭据"));
+    }
+
+    /**
+     * 静态资源缺失（例如 {@code /favicon.ico}、{@code /assets/*.js} 不在 jar 里）→ 404001，
+     * 不再落到兜底 500：缺文件是客户端路径问题，不是服务故障。
+     *
+     * @param exception 资源未找到异常
+     * @return 404 错误响应
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(final NoResourceFoundException exception) {
+        final ErrorCode code = ErrorCode.NOT_FOUND;
+        return ResponseEntity.status(HttpStatus.valueOf(code.getHttpStatus())).body(ApiResponse
+                .error(Integer.parseInt(code.getCode()), "资源不存在: " + exception.getResourcePath()));
+    }
+
+    /**
+     * SSE 连接被客户端断开（RFC 007 的组件日志流）：响应头已固定为 {@code text/event-stream}，
+     * 写统一响应体会再抛 {@code HttpMessageNotWritableException}。这里只记 debug 交给容器收尾，
+     * 避免每次关闭日志面板都在服务端打一条 ERROR。
+     *
+     * @param exception 异步响应已不可用的信号
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(final AsyncRequestNotUsableException exception) {
+        log.debug("Async response is no longer usable", exception);
     }
 
     /**

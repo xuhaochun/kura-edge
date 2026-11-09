@@ -107,11 +107,7 @@ function onDragStart(event: DragEvent, descriptor: ComponentDescriptor, pid?: st
 
 <style scoped>
 .wires-palette {
-  height: 100%;
-  overflow-y: auto;
   padding: 8px 12px;
-  border-right: 1px solid #dcdfe6;
-  background: #fafbfc;
 }
 
 .wires-palette__title {

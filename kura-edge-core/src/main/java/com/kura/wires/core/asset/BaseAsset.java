@@ -93,7 +93,10 @@ public class BaseAsset implements Asset {
         if (!records.isEmpty()) {
             try {
                 attached.read(records);
-            } catch (final RuntimeException | Driver.ConnectionException e) {
+            } catch (final WiresException e) {
+                throw e;
+            } catch (final Driver.ConnectionException | RuntimeException e) {
+                this.connected = false;
                 throw new WiresException(ErrorCode.CHANNEL_IO_FAILED,
                         e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
             }
@@ -125,7 +128,10 @@ public class BaseAsset implements Asset {
         if (!validRecords.isEmpty()) {
             try {
                 attached.read(validRecords);
-            } catch (final RuntimeException | Driver.ConnectionException e) {
+            } catch (final WiresException e) {
+                throw e;
+            } catch (final Driver.ConnectionException | RuntimeException e) {
+                this.connected = false;
                 throw new WiresException(ErrorCode.CHANNEL_IO_FAILED,
                         e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
             }
@@ -153,7 +159,10 @@ public class BaseAsset implements Asset {
         if (!validRecords.isEmpty()) {
             try {
                 attached.write(validRecords);
-            } catch (final RuntimeException | Driver.ConnectionException e) {
+            } catch (final WiresException e) {
+                throw e;
+            } catch (final Driver.ConnectionException | RuntimeException e) {
+                this.connected = false;
                 throw new WiresException(ErrorCode.CHANNEL_IO_FAILED,
                         e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
             }

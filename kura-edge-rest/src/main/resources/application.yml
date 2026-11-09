@@ -6,7 +6,10 @@ spring:
   application:
     name: kura-edge
   datasource:
-    url: jdbc:h2:mem:kuraedge;DB_CLOSE_DELAY=-1
+    # 文件模式 H2：默认落盘到 ~/.kura-edge/data/kuraedge.mv.db（与驱动的 ~/.kura-edge/drivers 同级），
+    # 可用 KURA_EDGE_DATA_DIR 覆盖目录；AUTO_SERVER 允许 IDE 等第二个进程在运行时读同一个库。
+    # 测试用内存库覆盖，见 kura-edge-rest/src/test/resources/application.properties。
+    url: jdbc:h2:file:${KURA_EDGE_DATA_DIR:${user.home}/.kura-edge/data}/kuraedge;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
@@ -26,6 +29,13 @@ kura:
       username: admin
       # 仅占位符：生产环境必须通过 KURA_EDGE_ADMIN_PASSWORD 覆盖
       password: ${KURA_EDGE_ADMIN_PASSWORD:changeme}
+  driver:
+    host:
+      # auto：从 classes 目录运行且宿主类在 classpath 上（IDE / spring-boot:run）→ 同进程，便于断点调试；
+      # 打包成 fat jar 后宿主类不在 classpath 上 → 自动走独立进程（生产形态）。
+      # 也可显式写 process / in-process。
+      mode: auto
+      # debug-port: 5005     # 仅 process 模式：给子 JVM 开 JDWP，IDEA 用 Remote JVM Debug 连它
 
 springdoc:
   swagger-ui:

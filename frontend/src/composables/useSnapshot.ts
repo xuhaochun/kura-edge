@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { useWiresGraphStore } from '@/stores/wiresGraph'
 import { useMetadataStore } from '@/stores/metadata'
+import { useComponentConfigStore } from '@/stores/componentConfig'
 import { getSnapshot, putSnapshot, deleteGraph } from '@/api/wireGraph'
 import { getConfigsByPids } from '@/api/metadata'
 import { getAssetConfiguration } from '@/api/driversAssets'
@@ -31,6 +32,7 @@ function errMsg(error: unknown): string {
 export function useSnapshot() {
   const store = useWiresGraphStore()
   const metadata = useMetadataStore()
+  const config = useComponentConfigStore()
   const { t } = useI18n()
   const loading = ref(false)
   const saving = ref(false)
@@ -60,7 +62,11 @@ export function useSnapshot() {
       .map((component) => component.pid)
   }
 
-  /** 保存前兜底环检测（建线时已逐条校验，此处防线快照整体仍须无环） */
+  /**
+   * 保存整图。保存前先把「组件配置」表单里尚未应用的编辑写回图：
+   * 否则用户改完间隔直接点保存，提交的仍是旧值，后端的实例重建逻辑看不到变化，
+   * 运行中的定时器会继续按旧配置跑（对照上游：配置区改动需应用后才进图）。
+   */
   async function save(): Promise<void> {
     if (
       hasCycle(
@@ -73,6 +79,10 @@ export function useSnapshot() {
     const orphans = componentsWithoutFactoryPid()
     if (orphans.length > 0) {
       ElMessage.error(t('wires.messages.factoryPidMissingPids', { pids: orphans.join(', ') }))
+      return
+    }
+    if (config.editingPid !== null && !config.apply()) {
+      ElMessage.error(t('wires.config.applyBlockedSave'))
       return
     }
     saving.value = true

@@ -40,6 +40,7 @@ export default {
       none: 'Select a component to edit its configuration',
       apply: 'Apply',
       invalid: 'Some fields are invalid',
+      applyBlockedSave: 'Component configuration has invalid fields, save cancelled',
       applySuccess: 'Configuration applied',
       noFields: 'This component has no configurable properties',
       assetTab: 'Asset configuration',
@@ -51,6 +52,18 @@ export default {
       assetLoadFailed: 'Failed to load asset configuration: {msg}',
       driverLoadFailed: 'Failed to load driver configuration: {msg}',
       driverApplySuccess: 'Driver configuration applied',
+    },
+    logTail: {
+      title: 'Log details',
+      empty: 'No logs yet — waiting for the component to receive data…',
+      clear: 'Clear',
+      hint: 'Only the latest {max} lines are kept',
+      state: {
+        live: 'Live',
+        reconnecting: 'Reconnecting',
+        idle: 'Idle',
+        stopped: 'Stopped',
+      },
     },
     dialog: {
       downloadTitle: 'Download wire graph snapshot',
@@ -157,9 +170,10 @@ export default {
     },
     newAsset: {
       title: 'Create a New Asset',
-      intro: 'Provide the instance name (the Driver is the currently selected one).',
+      intro: 'Provide the instance name and pick the Driver this Asset belongs to.',
       name: 'Asset Name',
       driver: 'Driver Name',
+      driverPlaceholder: 'Select a Driver',
       description: 'Asset description',
     },
     actions: {

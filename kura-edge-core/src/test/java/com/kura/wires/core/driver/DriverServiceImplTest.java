@@ -145,6 +145,43 @@ public class DriverServiceImplTest {
         assertThat(this.service.getDriverPids()).isEmpty();
     }
 
+    @Test
+    public void registerFactoryAtRuntimeExposesItAndRebuildsInstances() {
+        this.configurationService.createFactoryConfiguration(FACTORY_PID, "late",
+                Map.of(WireGraphConstants.SERVICE_FACTORY_PID, FACTORY_PID));
+        final DriverServiceImpl fresh = new DriverServiceImpl(List.of(), this.configurationService);
+        assertThat(fresh.getDriverFactoryPids()).isEmpty();
+
+        fresh.registerFactory(new StubDriverFactory());
+        fresh.reloadAll();
+
+        assertThat(fresh.getDriverFactoryPids()).containsExactly(FACTORY_PID);
+        assertThat(fresh.findDriver("late")).isPresent();
+    }
+
+    @Test
+    public void unregisterFactoryDestroysItsInstances() {
+        whenCreatingDriver(FACTORY_PID, DRIVER_PID, Map.of());
+
+        this.service.unregisterFactory(FACTORY_PID);
+
+        assertThat(this.service.getDriverFactoryPids()).isEmpty();
+        assertThat(this.service.findDriver(DRIVER_PID)).isEmpty();
+        assertThat(this.configurationService.getConfiguration(DRIVER_PID)).isPresent();
+    }
+
+    @Test
+    public void reloadAllRebuildsInstances() {
+        whenCreatingDriver(FACTORY_PID, DRIVER_PID, Map.of());
+        final Driver before = this.service.findDriver(DRIVER_PID).orElseThrow();
+
+        this.service.reloadAll();
+
+        final Driver after = this.service.findDriver(DRIVER_PID).orElseThrow();
+        assertThat(after).isNotSameAs(before);
+        assertThat(this.service.getDriverPids()).containsExactly(DRIVER_PID);
+    }
+
     private void whenCreatingDriver(final String factoryPid, final String pid, final Map<String, Object> properties) {
         this.service.createDriver(factoryPid, pid, properties);
     }

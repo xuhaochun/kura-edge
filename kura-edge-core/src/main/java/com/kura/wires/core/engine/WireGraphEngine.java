@@ -4,6 +4,7 @@
  ******************************************************************************/
 package com.kura.wires.core.engine;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,9 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 import jakarta.annotation.PreDestroy;
 
@@ -71,16 +76,33 @@ public class WireGraphEngine implements WireGraphService {
 
     private static final Logger log = LoggerFactory.getLogger(WireGraphEngine.class);
 
+    /** CRON tick 允许在调度线程上原地等待的最长时间（超过则重新排程，避免占住共享调度线程） */
+    private static final long MAX_IN_PLACE_WAIT_NANOS = 2_000_000L;
+
     private final WireComponentRegistry registry;
     private final ComponentConfigurationService configurationService;
     private final SnapshotStore snapshotStore;
     private final GraphJsonCodec codec;
     private final PortValidator portValidator;
     private final EnvelopeRouter router;
-    private final Executor deliveryExecutor;
+    /** 信封投递器：有界池 + 每接收组件串行 lane（RFC 004） */
+    private final DeliveryDispatcher deliveryDispatcher;
+
+    /** 时钟（续排与「不早于计划时刻」判定用；测试注入可推进的时钟，避免真实等待） */
+    private final Clock clock;
 
     /** 自驱动组件的 tick 调度器（Timer 等） */
     private final TickScheduler tickScheduler;
+    /**
+     * 实例世代号（pid → 代数）：实例创建/销毁时递增，调度任务带上创建时的代数，
+     * 代数过期即视为「上一代实例的任务」，不再 tick、也不再续排。
+     * <p>
+     * 必须有时代号：CRON 链在每次 tick 的 finally 里排下一次，若保存恰好发生在某次
+     * tick 执行期间，旧实例的这条任务会在 {@code cancel} 之后仍把「旧实例」重新排上，
+     * 于是新的定时器被顶掉、旧定时器继续按原配置跑——表现就是「改了保存后旧的还在运行」。
+     * </p>
+     */
+    private final Map<String, Long> instanceGenerations = new ConcurrentHashMap<>();
     private volatile WireGraphConfiguration currentGraph = new WireGraphConfiguration();
 
     /**
@@ -94,8 +116,23 @@ public class WireGraphEngine implements WireGraphService {
     @Autowired
     public WireGraphEngine(final WireComponentRegistry registry, final ComponentConfigurationService configurationService,
             final SnapshotStore snapshotStore, final GraphJsonCodec codec) {
-        this(registry, configurationService, snapshotStore, codec, newDeliveryExecutor(),
-                new ScheduledExecutorTickScheduler());
+        this(registry, configurationService, snapshotStore, codec, DeliverySettings.fromSystemProperties());
+    }
+
+    /**
+     * 创建图引擎（由投递参数配置投递线程池与排队上限）。
+     *
+     * @param registry 组件注册表
+     * @param configurationService 组件配置服务
+     * @param snapshotStore 整图快照存储
+     * @param codec 整图 JSON 编解码器
+     * @param deliverySettings 投递参数
+     */
+    private WireGraphEngine(final WireComponentRegistry registry,
+            final ComponentConfigurationService configurationService, final SnapshotStore snapshotStore,
+            final GraphJsonCodec codec, final DeliverySettings deliverySettings) {
+        this(registry, configurationService, snapshotStore, codec, newDeliveryExecutor(deliverySettings),
+                new ScheduledExecutorTickScheduler(), Clock.systemUTC(), deliverySettings);
     }
 
     /**
@@ -126,31 +163,82 @@ public class WireGraphEngine implements WireGraphService {
     WireGraphEngine(final WireComponentRegistry registry, final ComponentConfigurationService configurationService,
             final SnapshotStore snapshotStore, final GraphJsonCodec codec, final Executor deliveryExecutor,
             final TickScheduler tickScheduler) {
+        this(registry, configurationService, snapshotStore, codec, deliveryExecutor, tickScheduler, Clock.systemUTC(),
+                DeliverySettings.defaults());
+    }
+
+    /**
+     * 创建图引擎（测试可注入调度器与可推进时钟，确定性验证 CRON 排程）。
+     *
+     * @param registry 组件注册表
+     * @param configurationService 组件配置服务
+     * @param snapshotStore 整图快照存储
+     * @param codec 整图 JSON 编解码器
+     * @param deliveryExecutor 信封投递执行器
+     * @param tickScheduler 自驱动组件的 tick 调度器
+     * @param clock 时钟
+     */
+    WireGraphEngine(final WireComponentRegistry registry, final ComponentConfigurationService configurationService,
+            final SnapshotStore snapshotStore, final GraphJsonCodec codec, final Executor deliveryExecutor,
+            final TickScheduler tickScheduler, final Clock clock) {
+        this(registry, configurationService, snapshotStore, codec, deliveryExecutor, tickScheduler, clock,
+                DeliverySettings.defaults());
+    }
+
+    /**
+     * 创建图引擎（测试可注入执行器、调度器、时钟与投递参数）。
+     *
+     * @param registry 组件注册表
+     * @param configurationService 组件配置服务
+     * @param snapshotStore 整图快照存储
+     * @param codec 整图 JSON 编解码器
+     * @param deliveryExecutor 信封投递执行器
+     * @param tickScheduler 自驱动组件的 tick 调度器
+     * @param clock 时钟
+     * @param deliverySettings 投递参数（每个接收组件的排队上限等）
+     */
+    WireGraphEngine(final WireComponentRegistry registry, final ComponentConfigurationService configurationService,
+            final SnapshotStore snapshotStore, final GraphJsonCodec codec, final Executor deliveryExecutor,
+            final TickScheduler tickScheduler, final Clock clock, final DeliverySettings deliverySettings) {
         this.registry = registry;
         this.configurationService = configurationService;
         this.snapshotStore = snapshotStore;
         this.codec = codec;
-        this.deliveryExecutor = deliveryExecutor;
         this.tickScheduler = tickScheduler;
+        this.clock = clock;
         this.portValidator = new PortValidator(registry);
-        this.router = new EnvelopeRouter(registry, deliveryExecutor);
+        this.deliveryDispatcher = new DeliveryDispatcher(deliveryExecutor, deliverySettings.receiverQueueCapacity());
+        this.router = new EnvelopeRouter(registry, this.deliveryDispatcher);
         registry.setEnvelopeDispatcher(this::dispatch);
         registry.addListener(new WireComponentRegistryListener() {
 
             @Override
             public void onInstanceCreated(final String pid, final String factoryPid, final WireComponent instance) {
-                scheduleInstance(pid, instance);
+                scheduleInstance(pid, instance, nextGeneration(pid));
                 refreshRoutes();
             }
 
             @Override
             public void onInstanceDestroyed(final String pid, final String factoryPid) {
+                // 先推进代数再取消排程：正在执行的旧任务看到代数已变，就不会再续排自己
+                nextGeneration(pid);
                 WireGraphEngine.this.tickScheduler.cancel(pid);
+                // 该实例已销毁：丢掉它排队中的信封，避免投递给已销毁的旧实例（重建替换时也会走到这里）
+                WireGraphEngine.this.deliveryDispatcher.removeLane(pid);
                 refreshRoutes();
             }
         });
         loadGraph();
         log.info("Wire graph engine started");
+    }
+
+    /**
+     * 返回信封投递计数快照（投递量 / 丢弃量），用于观测慢组件造成的积压与丢信封情况。
+     *
+     * @return 投递计数快照
+     */
+    public DeliveryStats getDeliveryStats() {
+        return this.deliveryDispatcher.stats();
     }
 
     @Override
@@ -202,6 +290,8 @@ public class WireGraphEngine implements WireGraphService {
         updateGraphCache(new WireGraphConfiguration());
         refreshRoutes();
         this.tickScheduler.cancelAll();
+        this.instanceGenerations.clear();
+        this.deliveryDispatcher.removeAllLanes();
         log.info("Wire graph deleted");
         if (!errors.isEmpty()) {
             throw new WiresException(ErrorCode.ENGINE_ERROR,
@@ -216,9 +306,7 @@ public class WireGraphEngine implements WireGraphService {
     public void shutdown() {
         this.tickScheduler.cancelAll();
         this.tickScheduler.shutdown();
-        if (this.deliveryExecutor instanceof final ExecutorService service) {
-            service.shutdownNow();
-        }
+        this.deliveryDispatcher.close();
     }
 
     private void validate(final WireGraphConfiguration graphConfiguration) {
@@ -447,17 +535,18 @@ public class WireGraphEngine implements WireGraphService {
      *
      * @param pid 组件实例 PID
      * @param instance 组件实例
+     * @param generation 实例世代号（调度任务只在这一代实例仍有效时执行/续排）
      */
-    private void scheduleInstance(final String pid, final WireComponent instance) {
+    private void scheduleInstance(final String pid, final WireComponent instance, final long generation) {
         if (!(instance instanceof ScheduledEmitter emitter)) {
             return;
         }
         try {
             if (emitter.isPeriodic()) {
-                this.tickScheduler.schedulePeriodic(pid, emitter::tick, emitter.getInitialDelayMillis(),
-                        emitter.getPeriodMillis());
+                this.tickScheduler.schedulePeriodic(pid, () -> tickIfCurrent(pid, emitter, generation),
+                        emitter.getInitialDelayMillis(), emitter.getPeriodMillis());
             } else {
-                scheduleNextCronTick(pid, emitter);
+                scheduleNextCronTick(pid, emitter, generation);
             }
             log.info("Scheduled wire component {} for periodic ticks: {}", pid, emitter.isPeriodic());
         } catch (final RuntimeException e) {
@@ -466,22 +555,131 @@ public class WireGraphEngine implements WireGraphService {
         }
     }
 
-    private void scheduleNextCronTick(final String pid, final ScheduledEmitter emitter) {
-        final Instant now = Instant.now();
-        final Instant next = emitter.nextCronFireTime(now);
+    private void scheduleNextCronTick(final String pid, final ScheduledEmitter emitter, final long generation) {
+        scheduleCronTickAfter(pid, emitter, generation, this.clock.instant());
+    }
+
+    /**
+     * 按 {@code after} 之后的第一个 CRON 触发时刻排下一次 tick。
+     *
+     * @param pid 组件实例 PID
+     * @param emitter 自驱动组件
+     * @param generation 实例世代号
+     * @param after 起算时刻（续排时必须传「上一个计划触发时刻」，原因见 {@link #runCronTick}）
+     */
+    private void scheduleCronTickAfter(final String pid, final ScheduledEmitter emitter, final long generation,
+            final Instant after) {
+        if (!isCurrentGeneration(pid, generation)) {
+            // 实例已被替换：旧实例的 CRON 链到此为止，不再排下一次
+            log.debug("Stopping CRON chain of replaced instance {} (generation {})", pid, generation);
+            return;
+        }
+        final Instant next = emitter.nextCronFireTime(after);
         if (next == null) {
             log.warn("Wire component {} has no further CRON fire time, scheduling stopped", pid);
             return;
         }
-        final long delay = Math.max(0L, Duration.between(now, next).toMillis());
-        this.tickScheduler.scheduleOnce(pid, () -> {
-            try {
-                emitter.tick();
-            } finally {
-                // 单次触发失败也要排下一次，否则 CRON 链一次异常就断掉
-                scheduleNextCronTick(pid, emitter);
-            }
-        }, delay);
+        // 延迟向上取整：秒级 CRON 的计划触发时刻是整秒，向下截断会让任务提前不到 1ms 唤醒，
+        // 日志时间戳就变成 “:49.999Z” 这种非整秒形态（并且会重算回同一拍，见 runCronTick）
+        this.tickScheduler.scheduleOnce(pid, () -> runCronTick(pid, emitter, generation, next),
+                delayMillisCeil(this.clock.instant(), next));
+    }
+
+    /**
+     * 执行一次 CRON tick 并排下一次，下一次从「本次计划触发时刻 {@code fireAt}」起算。
+     * <p>
+     * 两个约束：
+     * </p>
+     * <ul>
+     * <li>不得早于 {@code fireAt} 发射：秒级 CRON 落在整秒，提前 1ms 唤醒会让日志显示
+     * “:49.999Z” 而不是 “:49.000Z”；提前唤醒时补排剩余时间而不是直接 tick。</li>
+     * <li>不能用 {@code Instant.now()} 续排：提前唤醒时 {@code CronExpression.next(now)}
+     * 仍算回同一个触发时刻，delay 归零会立刻再发一次（同一拍重复日志）。</li>
+     * </ul>
+     *
+     * @param pid 组件实例 PID
+     * @param emitter 自驱动组件
+     * @param generation 实例世代号
+     * @param fireAt 本次 tick 的计划触发时刻
+     */
+    private void runCronTick(final String pid, final ScheduledEmitter emitter, final long generation,
+            final Instant fireAt) {
+        if (!awaitFireTime(pid, emitter, generation, fireAt)) {
+            return;
+        }
+        try {
+            tickIfCurrent(pid, emitter, generation);
+        } finally {
+            // 单次触发失败也要排下一次，否则 CRON 链一次异常就断掉；
+            // 续排同样按世代号判定，避免把已被替换的旧实例重新排上
+            final Instant after = this.clock.instant();
+            scheduleCronTickAfter(pid, emitter, generation, after.isAfter(fireAt) ? after : fireAt);
+        }
+    }
+
+    /**
+     * 等到计划触发时刻再发射（秒级 CRON 的计划时刻是整秒）。
+     * <p>
+     * 调度器按毫秒排程，可能提前不到 1ms 唤醒；直接发射会让时间戳落在 “:49.999”。
+     * 亚毫秒级的剩余时间就地 {@link LockSupport#parkNanos} 等过去（唤醒抖动只有几十微秒，
+     * 时间戳仍是 “:49.000”）；剩余时间较长时说明调度器唤醒早得不正常，改走重新排程，
+     * 不占住共享的调度线程空等。
+     * </p>
+     *
+     * @param pid 组件实例 PID
+     * @param emitter 自驱动组件
+     * @param generation 实例世代号
+     * @param fireAt 本次 tick 的计划触发时刻
+     * @return {@code true} 表示已到计划时刻可以发射；{@code false} 表示已重新排程、本次不发射
+     */
+    private boolean awaitFireTime(final String pid, final ScheduledEmitter emitter, final long generation,
+            final Instant fireAt) {
+        long remainingNanos = Duration.between(this.clock.instant(), fireAt).toNanos();
+        if (remainingNanos <= 0L) {
+            return true;
+        }
+        if (remainingNanos > MAX_IN_PLACE_WAIT_NANOS) {
+            this.tickScheduler.scheduleOnce(pid, () -> runCronTick(pid, emitter, generation, fireAt),
+                    delayMillisCeil(this.clock.instant(), fireAt));
+            return false;
+        }
+        while (remainingNanos > 0L) {
+            LockSupport.parkNanos(remainingNanos);
+            remainingNanos = Duration.between(this.clock.instant(), fireAt).toNanos();
+        }
+        return true;
+    }
+
+    /**
+     * 从 {@code now} 到 {@code target} 的毫秒延迟，向上取整（保证唤醒时刻不早于 target）。
+     *
+     * @param now 当前时刻
+     * @param target 目标时刻
+     * @return 毫秒延迟（已到或已过目标时刻时为 0）
+     */
+    private static long delayMillisCeil(final Instant now, final Instant target) {
+        final long nanos = Duration.between(now, target).toNanos();
+        return nanos <= 0L ? 0L : (nanos + 999_999L) / 1_000_000L;
+    }
+
+    private void tickIfCurrent(final String pid, final ScheduledEmitter emitter, final long generation) {
+        if (isCurrentGeneration(pid, generation)) {
+            emitter.tick();
+        }
+    }
+
+    /**
+     * 推进并返回 pid 的实例世代号（创建、销毁各推进一次）。
+     *
+     * @param pid 组件实例 PID
+     * @return 推进后的世代号
+     */
+    private long nextGeneration(final String pid) {
+        return this.instanceGenerations.merge(pid, 1L, Long::sum);
+    }
+
+    private boolean isCurrentGeneration(final String pid, final long generation) {
+        return this.instanceGenerations.getOrDefault(pid, 0L) == generation;
     }
 
     private boolean propertiesChanged(final WireComponentConfiguration previous,
@@ -541,12 +739,21 @@ public class WireGraphEngine implements WireGraphService {
         createdInstances.put(pid, factoryPid);
     }
 
-    private static ExecutorService newDeliveryExecutor() {
-        return Executors.newCachedThreadPool(runnable -> {
-            final Thread thread = new Thread(runnable, "wire-envelope-delivery");
-            thread.setDaemon(true);
-            return thread;
-        });
+    /**
+     * 创建有界投递线程池（RFC 004）：固定线程数 + 有界共享队列，
+     * 池/队列满时抛 {@link java.util.concurrent.RejectedExecutionException} 由
+     * {@link DeliveryDispatcher} 计数并丢弃该信封，不再像 cached pool 那样无界建线程。
+     *
+     * @param settings 投递参数
+     * @return 有界投递线程池
+     */
+    private static ExecutorService newDeliveryExecutor(final DeliverySettings settings) {
+        return new ThreadPoolExecutor(settings.threads(), settings.threads(), 60L, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(settings.poolQueueCapacity()), runnable -> {
+                    final Thread thread = new Thread(runnable, "wire-envelope-delivery");
+                    thread.setDaemon(true);
+                    return thread;
+                }, new ThreadPoolExecutor.AbortPolicy());
     }
 
     /** 回滚用：被销毁的组件实例快照。 */

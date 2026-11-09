@@ -88,8 +88,11 @@ kura-edge/
 │                              #   WireGraphConfiguration、MultiportWireConfiguration、组件 SPI
 ├── kura-edge-core/            # 图引擎：WireGraphEngine、环检测/端口校验、组件注册表、快照持久化
 ├── kura-edge-components/      # 内置组件：Timer、Logger、RegexFilter、DbStore、CloudPublisher、Fifo…
+├── kura-edge-driver-host/     # 驱动宿主进程（独立可执行 jar，RFC 006）：Modbus/Simulated 驱动实现
+│                              #   + loopback JSON-RPC，可整包热替换，主程序 reload 即生效
 ├── kura-edge-rest/            # Spring Boot 启动模块：Controller、DTO、全局异常、安全配置
-└── frontend/                  # Vue 3 前端（Vite）
+├── frontend/                  # Vue 3 前端（Vite）
+└── desktop/                   # 桌面外壳（Tauri 2 + 内嵌 JRE 17），产出 NSIS setup.exe（RFC 005）
 ```
 
 完整目录约定见 `.claude/rules/03-project-structure.md`；分层与依赖规则见 `.claude/rules/04-architecture-layers.md`。
@@ -110,6 +113,21 @@ mvn spring-boot:run -pl kura-edge-rest   # 本地起后端（默认 8080）
 npm install
 npm run dev                      # 开发服务器（代理 /api → 8080）
 npm run lint && npm run test:unit && npm run build
+
+# 桌面安装包（desktop/；Linux 上交叉编译 Windows NSIS，产物 desktop/dist/*-setup.exe）
+bash desktop/scripts/build-desktop.sh    # 详见 desktop/README.md
+
+# 驱动宿主（RFC 006）：产物固定为 kura-edge-driver-host/target/kura-edge-driver-host.jar（不带版本号）
+# IDE 调试：直接 Run KuraEdgeApplication 即为同进程模式（kura.driver.host.mode=auto），
+#   断点可直接打在 com.kura.wires.driverhost.* / ModbusDriver / RpcDispatcher 上；
+#   想调试"独立进程"形态：-Dkura.driver.host.mode=process -Dkura.driver.host.debug-port=5005，
+#   再用 IDEA Remote JVM Debug 连 5005（打包后的 fat jar 永远走独立进程）。
+mvn -pl kura-edge-driver-host -am -DskipTests package    # 离线环境加 -o
+mvn -pl kura-edge-driver-host -am package                # 连测试一起跑
+
+# 驱动热更新（RFC 006）：替换 ~/.kura-edge/drivers/kura-edge-driver-host.jar 后
+curl -u admin:<password> -X PUT http://127.0.0.1:<port>/api/v1/wires/drivers/host
+# 或 GET /api/v1/wires/drivers/host 查看宿主状态（running/port/version/factories）
 ```
 
 提交前验证命令与禁令清单见 `.claude/rules/05-boundaries-and-verification.md`。

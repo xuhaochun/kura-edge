@@ -22,11 +22,41 @@ export const http = axios.create({
   timeout: 15000,
 })
 
-// 可选 HTTP Basic（wires.admin）凭据只经环境变量注入，禁止硬编码（rules/05 安全边界）
-const username = import.meta.env.VITE_WIRES_USERNAME
-const password = import.meta.env.VITE_WIRES_PASSWORD
-if (username !== undefined && password !== undefined) {
-  http.defaults.headers.common.Authorization = `Basic ${btoa(`${username}:${password}`)}`
+/** 桌面外壳（Tauri）在页面加载前注入的一次性管理员凭据：只存在于内存，不落盘、不进 bundle（RFC 005）。 */
+interface DesktopRuntimeAuth {
+  username: string
+  password: string
+}
+
+function desktopRuntimeAuth(): DesktopRuntimeAuth | undefined {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+  return (window as Window & { __KURA_EDGE_AUTH__?: DesktopRuntimeAuth }).__KURA_EDGE_AUTH__
+}
+
+// 凭据来源优先级：桌面外壳运行时注入 > 构建期环境变量（浏览器/开发期用法）。
+// 二者都没有时不发 Authorization 头，请求由后端的 401 统一响应体接管。
+// 注意用真值判断而非 undefined 判断：桌面包构建时显式传空串，用来抵消 .env.local 里的开发凭据。
+const injectedAuth = desktopRuntimeAuth()
+const username = injectedAuth?.username ?? import.meta.env.VITE_WIRES_USERNAME
+const password = injectedAuth?.password ?? import.meta.env.VITE_WIRES_PASSWORD
+
+/**
+ * 当前会话的 HTTP Basic 认证头（`Basic ...`）。
+ * 供不能走 axios 的调用方复用同一份凭据：RFC 007 的 SSE 日志流用原生 `fetch`，
+ * 因为浏览器的 `EventSource` 不支持自定义请求头、带不上 Basic 凭据。
+ */
+export function authorizationHeader(): string | undefined {
+  if (!username || !password) {
+    return undefined
+  }
+  return `Basic ${btoa(`${username}:${password}`)}`
+}
+
+const basicAuthorization = authorizationHeader()
+if (basicAuthorization) {
+  http.defaults.headers.common.Authorization = basicAuthorization
 }
 
 function isEnvelope(body: unknown): body is ApiEnvelope<unknown> {

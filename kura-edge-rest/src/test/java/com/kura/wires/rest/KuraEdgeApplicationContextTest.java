@@ -5,7 +5,6 @@
 package com.kura.wires.rest;
 
 import com.kura.wires.components.db.DbStoreFactory;
-import com.kura.wires.components.driver.modbus.ModbusDriverFactory;
 import com.kura.wires.components.fifo.FifoFactory;
 import com.kura.wires.components.logger.LoggerFactory;
 import com.kura.wires.components.publisher.CloudPublisherFactory;
@@ -14,6 +13,7 @@ import com.kura.wires.components.subscriber.CloudSubscriberFactory;
 import com.kura.wires.components.asset.WireAssetFactory;
 import com.kura.wires.components.timer.TimerFactory;
 import com.kura.wires.core.driver.DriverService;
+import com.kura.wires.core.driver.remote.DriverHostManager;
 import com.kura.wires.core.registry.WireComponentRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +38,9 @@ class KuraEdgeApplicationContextTest {
     @Autowired
     private DriverService driverService;
 
+    @Autowired
+    private DriverHostManager driverHostManager;
+
     @Test
     void contextStarts() {
         // 上下文启动成功即通过（含 Flyway 迁移、JPA validate、安全装配、图引擎装配）
@@ -54,9 +57,11 @@ class KuraEdgeApplicationContextTest {
     }
 
     @Test
-    void modbusDriverFactoryIsRegistered() {
-        assertThat(this.driverService.getDriverFactoryPids()).contains(ModbusDriverFactory.FACTORY_PID,
-                "org.eclipse.kura.driver.simulated");
+    void driverHostIsDisabledInTests() {
+        // 驱动实现已迁到宿主进程（RFC 006）；测试里用 kura.driver.host.enabled=false 避免起真实 JVM，
+        // 真实的「宿主拉起 → 工厂注册」链路由 DriverHostManagerTest / 手工冒烟覆盖。
+        assertThat(this.driverService.getDriverFactoryPids()).isEmpty();
+        assertThat(this.driverHostManager.status().running()).isFalse();
     }
 
     @Test

@@ -9,6 +9,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent } from 'vue'
 import ElementPlus from 'element-plus'
+import type { Stubs } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import { i18n } from '@/i18n'
 
@@ -43,6 +44,22 @@ vi.mock('@/api/metadata', () => ({
 
 /** 路由出口宿主：页面通过 router-view 挂载，onBeforeRouteLeave 才有路由上下文 */
 const Host = defineComponent({ template: '<router-view />' })
+
+/** 新建资产弹窗替身：暴露页面传下来的默认驱动，并可按默认值提交（只断言页面编排，不测弹窗内部） */
+function stubNewAssetDialog() {
+  return {
+    name: 'NewAssetDialog',
+    props: { modelValue: Boolean, drivers: Array, defaultDriverPid: String },
+    emits: ['submit', 'update:modelValue'],
+    template: `<div class="stub-new-asset" :data-default="defaultDriverPid">
+      <button
+        class="stub-new-asset__submit"
+        @click="$emit('submit', { pid: 'asset-new', driverPid: defaultDriverPid, description: '' })"
+      >submit</button>
+    </div>`,
+  }
+}
+
 import { useDriversAssetsStore } from '@/stores/driversAssets'
 
 const DRIVER_PID = 'driver1'
@@ -96,12 +113,12 @@ describe('DriversAssetsPage', () => {
     api.getAssetChannels.mockResolvedValue([])
   })
 
-  async function mountPage() {
+  async function mountPage(stubs: Stubs = {}) {
     const router = createTestRouter()
     await router.push('/drivers-assets')
     await router.isReady()
     const wrapper = mount(Host, {
-      global: { plugins: [createPinia(), i18n, ElementPlus, router] },
+      global: { plugins: [createPinia(), i18n, ElementPlus, router], stubs },
     })
     await flushPromises()
     return wrapper
@@ -144,5 +161,52 @@ describe('DriversAssetsPage', () => {
 
     const deleteButton = wrapper.findAll('button').find((button) => button.text() === '删除')
     expect(deleteButton?.attributes('disabled')).toBeDefined()
+  })
+
+  it('givenSelectedDriverWhenCreatingAssetThenBindsThatDriver', async () => {
+    const wrapper = await mountPage({ NewAssetDialog: stubNewAssetDialog() })
+    const store = useDriversAssetsStore()
+    await store.select('driver', DRIVER_PID)
+    await flushPromises()
+
+    const newAssetButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('新建 Asset'))!
+    expect(newAssetButton.attributes('disabled')).toBeUndefined()
+    await newAssetButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.stub-new-asset').attributes('data-default')).toBe(DRIVER_PID)
+
+    await wrapper.find('.stub-new-asset__submit').trigger('click')
+    await flushPromises()
+
+    expect(api.createAsset).toHaveBeenCalledWith('asset-new', DRIVER_PID, '')
+  })
+
+  it('givenSelectedAssetWhenCreatingAssetThenDefaultsToItsDriver', async () => {
+    const wrapper = await mountPage({ NewAssetDialog: stubNewAssetDialog() })
+    const store = useDriversAssetsStore()
+    await store.select('asset', ASSET_PID)
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('新建 Asset'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.stub-new-asset').attributes('data-default')).toBe(DRIVER_PID)
+  })
+
+  it('givenNoDriverAtAllWhenToolbarRendersThenNewAssetIsDisabled', async () => {
+    api.getDriverInfos.mockResolvedValue([])
+    api.getAssetInfos.mockResolvedValue([])
+    const wrapper = await mountPage()
+
+    const newAssetButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('新建 Asset'))
+    expect(newAssetButton?.attributes('disabled')).toBeDefined()
   })
 })

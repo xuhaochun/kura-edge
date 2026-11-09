@@ -33,7 +33,9 @@ public enum ErrorCode {
     /** 持久化错误 */
     PERSISTENCE_ERROR("500002", 500),
     /** 通道 IO / 驱动调用失败（资产读写） */
-    CHANNEL_IO_FAILED("500003", 500);
+    CHANNEL_IO_FAILED("500003", 500),
+    /** 驱动宿主进程不可用 / 重载失败（RFC 006） */
+    DRIVER_HOST_UNAVAILABLE("503001", 503);
 
     private final String code;
     private final int httpStatus;

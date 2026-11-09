@@ -32,6 +32,9 @@ public final class Logger implements WireReceiver {
 
     private final String pid;
 
+    /** 运行日志环形缓冲：写 SLF4J 的同时写一份，供前端「日志详情」面板 tail -f（RFC 007） */
+    private final ComponentLogBuffer logBuffer;
+
     /** 配置可经 updated() 热更新（对照上游 updated 回调），故为 volatile */
     private volatile Map<String, Object> properties;
 
@@ -40,10 +43,12 @@ public final class Logger implements WireReceiver {
      *
      * @param pid 组件实例 PID
      * @param properties 组件配置属性（已合并默认值）
+     * @param logBuffer 运行日志环形缓冲
      */
-    Logger(final String pid, final Map<String, Object> properties) {
+    Logger(final String pid, final Map<String, Object> properties, final ComponentLogBuffer logBuffer) {
         this.pid = pid;
         this.properties = requireNonNull(properties, "Properties cannot be null");
+        this.logBuffer = requireNonNull(logBuffer, "Log buffer cannot be null");
     }
 
     /**
@@ -68,14 +73,20 @@ public final class Logger implements WireReceiver {
     @Override
     public void onWireReceive(final WireEnvelope wireEnvelope) {
         requireNonNull(wireEnvelope, "Wire Envelope cannot be null");
+        final String receivedFrom = "Received WireEnvelope from " + wireEnvelope.getEmitterPid();
         LOG.info("Received WireEnvelope from {}", wireEnvelope.getEmitterPid());
+        this.logBuffer.append(this.pid, receivedFrom);
 
         if (LoggingVerbosity.VERBOSE.name().equals(getLoggingLevel())) {
             LOG.info("Record List content: ");
+            this.logBuffer.append(this.pid, "Record List content: ");
             for (final var record : wireEnvelope.getRecords()) {
                 LOG.info("  Record content: ");
+                this.logBuffer.append(this.pid, "  Record content: ");
                 for (final Map.Entry<String, TypedValue<?>> entry : record.getProperties().entrySet()) {
                     LOG.info("    {} : {}", entry.getKey(), entry.getValue().getValue());
+                    this.logBuffer.append(this.pid,
+                            "    " + entry.getKey() + " : " + entry.getValue().getValue());
                 }
             }
         }

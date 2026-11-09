@@ -8,6 +8,7 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import LoggerLogPanel from './LoggerLogPanel.vue'
 import ValidationInput from './ValidationInput.vue'
 import WireAssetConfiguration from './WireAssetConfiguration.vue'
 import { useComponentConfigStore } from '@/stores/componentConfig'
@@ -15,6 +16,9 @@ import { useWiresGraphStore } from '@/stores/wiresGraph'
 import { useMetadataText } from '@/composables/useMetadataText'
 import { WIRE_ASSET_FACTORY_PID } from '@/types/driversAssets'
 import type { ConfigParameter } from '@/types/wires'
+
+/** Logger 组件工厂 PID（与后端 LoggerFactory.FACTORY_PID 一致）：仅它显示运行日志详情（RFC 007） */
+const LOGGER_FACTORY_PID = 'org.eclipse.kura.wire.Logger'
 
 const graph = useWiresGraphStore()
 const config = useComponentConfigStore()
@@ -26,6 +30,9 @@ const factoryPid = computed(() => config.component?.factoryPid ?? '')
 
 /** 资产使用专用配置区（通道表 + Driver 页签），普通组件仍走扁平 OCD 表单 */
 const isAsset = computed(() => factoryPid.value === WIRE_ASSET_FACTORY_PID)
+
+/** 日志记录器：表单下方追加「日志详情」实时面板（RFC 007） */
+const isLogger = computed(() => factoryPid.value === LOGGER_FACTORY_PID)
 
 /** 字段标签：中文名，未登记翻译时回落后端 metatype 名 */
 function paramLabel(param: ConfigParameter): string {
@@ -101,6 +108,8 @@ function apply(): void {
           </el-button>
         </el-form>
       </template>
+      <!-- 日志记录器专属：配置下方实时 tail -f 该组件收到的记录（RFC 007） -->
+      <LoggerLogPanel v-if="isLogger" :pid="config.component.pid" />
     </template>
   </div>
 </template>
@@ -110,7 +119,6 @@ function apply(): void {
   height: 100%;
   overflow-y: auto;
   padding: 8px 12px;
-  border-left: 1px solid #dcdfe6;
 }
 
 .config-area__title {

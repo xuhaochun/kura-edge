@@ -7,6 +7,8 @@
     <file url="file://$PROJECT_DIR$/kura-edge-components/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/kura-edge-core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/kura-edge-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/kura-edge-driver-host/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/kura-edge-driver-host/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/kura-edge-rest/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/kura-edge-rest/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />

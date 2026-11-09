@@ -28,6 +28,7 @@ import com.kura.wires.core.registry.WireComponentRegistry;
 import com.kura.wires.core.registry.WireComponentRegistryListener;
 import com.kura.wires.core.snapshot.GraphJsonCodec;
 import com.kura.wires.core.snapshot.SnapshotStore;
+import com.kura.wires.core.testsupport.MutableClock;
 import com.kura.wires.engine.DrainableComponent;
 import com.kura.wires.engine.ScheduledEmitter;
 import com.kura.wires.model.ComponentConfiguration;
@@ -55,6 +56,7 @@ class WireGraphEngineSchedulingTest {
     private SnapshotStore snapshotStore;
     private GraphJsonCodec codec;
     private FakeTickScheduler scheduler;
+    private MutableClock clock;
     private WireGraphEngine engine;
     private WireComponentRegistryListener listener;
     private RuntimeException tickFailure;
@@ -66,11 +68,12 @@ class WireGraphEngineSchedulingTest {
         this.snapshotStore = mock(SnapshotStore.class);
         this.codec = new GraphJsonCodec();
         this.scheduler = new FakeTickScheduler();
+        this.clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
         this.tickFailure = null;
         when(this.snapshotStore.load(SERVICE_PID)).thenReturn(Optional.empty());
         when(this.registry.findFactory(anyString())).thenReturn(Optional.empty());
         this.engine = new WireGraphEngine(this.registry, this.configurationService, this.snapshotStore, this.codec,
-                Runnable::run, this.scheduler);
+                Runnable::run, this.scheduler, this.clock);
         this.listener = capturedListener();
     }
 
@@ -172,6 +175,8 @@ class WireGraphEngineSchedulingTest {
 
     private void whenRunningPendingTask(final String pid) {
         final Runnable task = this.scheduler.pending.get(pid);
+        // 假调度器不真的等：把注入时钟推进到排程时刻，模拟「到点才跑」
+        this.clock.advanceMillis(this.scheduler.delays.getOrDefault(pid, 0L));
         try {
             task.run();
         } catch (final RuntimeException e) {

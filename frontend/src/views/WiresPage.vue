@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /**
- * Wires 图编辑器页（对照上游 WiresPanelUi 布局）：
- * 工具栏（保存/重新加载/删除整图/导出/导入/缩放/删除组件）+ 组件面板 + 画布 + 配置区；
+ * Wires 图编辑器页（布局偏离上游 WiresPanelUi 的左右三栏：去掉左侧组件面板列，画布独占其余宽度）：
+ * 工具栏（保存/重新加载/删除整图/导出/导入/缩放/删除组件）+ 画布；
+ * 右侧一列 = 「组件面板」（组件定义 / 资产清单，点击或拖到画布新建）+「组件配置」（选中组件的属性表单）；
+ * 未选中组件时只显示组件面板（对照上游 configurationRow 默认隐藏、选中才出现）。
  * 未保存变更离开提示（onBeforeRouteLeave + beforeunload）。
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue'
@@ -177,14 +179,20 @@ onBeforeRouteLeave(async () => {
       />
     </header>
     <div class="wires-page__body">
-      <aside class="wires-page__left">
-        <WiresPalette @create="onPaletteCreate" />
-      </aside>
       <main class="wires-page__canvas">
         <WiresComposer ref="composerRef" @create="onDropCreate" />
       </main>
       <aside class="wires-page__right">
-        <ConfigurationArea />
+        <!-- 未选中组件时右栏只留组件面板（对着上游 configurationRow 默认隐藏的行为），面板可占满整列 -->
+        <section
+          class="wires-page__palette"
+          :class="{ 'wires-page__palette--expanded': !store.selectedPid }"
+        >
+          <WiresPalette @create="onPaletteCreate" />
+        </section>
+        <section v-if="store.selectedPid" class="wires-page__config">
+          <ConfigurationArea />
+        </section>
       </aside>
     </div>
   </div>
@@ -221,18 +229,38 @@ onBeforeRouteLeave(async () => {
   min-height: 0;
 }
 
-.wires-page__left {
-  width: 240px;
-  flex-shrink: 0;
-}
-
 .wires-page__canvas {
   flex: 1;
   min-width: 0;
 }
 
 .wires-page__right {
+  display: flex;
+  flex-direction: column;
   width: 460px;
   flex-shrink: 0;
+  min-height: 0;
+  border-left: 1px solid #dcdfe6;
+  background: #fff;
+}
+
+/* 组件面板限高并自己滚动，剩余高度留给选中组件的配置表单 */
+.wires-page__palette {
+  flex: 0 0 auto;
+  max-height: 40%;
+  overflow-y: auto;
+  background: #fafbfc;
+}
+
+/* 未选中组件时没有配置表单，面板直接吃满右栏，不留空占位 */
+.wires-page__palette--expanded {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
+.wires-page__config {
+  flex: 1 1 auto;
+  min-height: 0;
+  border-top: 1px solid #dcdfe6;
 }
 </style>

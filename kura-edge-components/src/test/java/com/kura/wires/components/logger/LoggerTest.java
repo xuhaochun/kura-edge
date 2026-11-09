@@ -32,7 +32,9 @@ import com.kura.wires.model.type.StringValue;
  */
 class LoggerTest {
 
-    private final LoggerFactory factory = new LoggerFactory();
+    private final ComponentLogBuffer logBuffer = new ComponentLogBuffer();
+
+    private final LoggerFactory factory = new LoggerFactory(this.logBuffer);
 
     private ListAppender<ILoggingEvent> logAppender;
     private Logger logger;
@@ -88,6 +90,37 @@ class LoggerTest {
     }
 
     @Test
+    public void successfulQuietDeliveryWritesSingleLineToLogBuffer() {
+        givenQuietLogger();
+        givenEnvelopeFromTimer();
+
+        whenOnWireReceive();
+
+        thenBufferContainsOnlyEmitterPid();
+    }
+
+    @Test
+    public void successfulVerboseDeliveryWritesRecordEntriesToLogBuffer() {
+        givenVerboseLogger();
+        givenEnvelopeFromTimer();
+
+        whenOnWireReceive();
+
+        thenBufferContainsEveryRecordEntry();
+    }
+
+    @Test
+    public void successfulFactoryCreatedLoggerSharesBuffer() {
+        givenQuietLogger();
+        givenEnvelopeFromTimer();
+
+        whenFactoryCreate();
+        whenOnWireReceive();
+
+        thenBufferContainsOnlyEmitterPid();
+    }
+
+    @Test
     public void rejectNullEnvelope() {
         givenQuietLogger();
 
@@ -119,16 +152,28 @@ class LoggerTest {
 
     private void givenQuietLogger() {
         givenProperties(new HashMap<>(Map.of(Logger.PROP_LOG_LEVEL, LoggingVerbosity.QUIET.name())));
-        this.logger = new Logger("logger-1", this.properties);
+        this.logger = new Logger("logger-1", this.properties, this.logBuffer);
     }
 
     private void givenVerboseLogger() {
         givenProperties(new HashMap<>(Map.of(Logger.PROP_LOG_LEVEL, LoggingVerbosity.VERBOSE.name())));
-        this.logger = new Logger("logger-1", this.properties);
+        this.logger = new Logger("logger-1", this.properties, this.logBuffer);
     }
 
     private void givenProperties(final Map<String, Object> properties) {
         this.properties = properties;
+    }
+
+    private void thenBufferContainsOnlyEmitterPid() {
+        final List<ComponentLogLine> lines = this.logBuffer.tail("logger-1", 0L, ComponentLogBuffer.CAPACITY);
+        assertThat(lines).hasSize(1);
+        assertThat(lines.get(0).text()).contains("timer-1").doesNotContain("TEMP");
+    }
+
+    private void thenBufferContainsEveryRecordEntry() {
+        final List<ComponentLogLine> lines = this.logBuffer.tail("logger-1", 0L, ComponentLogBuffer.CAPACITY);
+        final String joined = lines.stream().map(ComponentLogLine::text).reduce("", (left, right) -> left + " | " + right);
+        assertThat(joined).contains("TEMP").contains("25").contains("NAME").contains("edge");
     }
 
     private void givenEnvelopeFromTimer() {

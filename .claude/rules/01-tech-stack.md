@@ -29,6 +29,15 @@
 | 测试 | Vitest + Vue Test Utils |
 | 规范 | ESLint（flat config）+ Prettier |
 
+## 桌面打包（RFC 005）
+
+| 项 | 选型 |
+|---|---|
+| 外壳 | Tauri 2（Rust；WebView2 on Windows） |
+| Java 运行时 | 内嵌 Temurin 17 JRE（Windows x64），目标机不需要预装 Java |
+| 安装包 | NSIS `-setup.exe`（`installMode=currentUser`）；交叉编译用 `cargo-xwin` + `lld-link` |
+| 前端托管 | Spring Boot 托管 `frontend/dist`（`-Pdesktop`），同源、无 CORS |
+
 ## 禁止引入
 
 - 任何 OSGi 依赖（osgi.core、osgi.service.*、bnd 等）——本项目就是去 OSGi 化

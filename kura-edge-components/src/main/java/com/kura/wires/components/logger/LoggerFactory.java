@@ -29,6 +29,18 @@ public final class LoggerFactory implements WireComponentFactory {
     /** 工厂 PID，与上游 factoryPid 完全一致 */
     public static final String FACTORY_PID = "org.eclipse.kura.wire.Logger";
 
+    /** 运行日志缓冲：由 Spring 容器注入，组件实例共用同一份（RFC 007） */
+    private final ComponentLogBuffer logBuffer;
+
+    /**
+     * 创建工厂。
+     *
+     * @param logBuffer 运行日志环形缓冲
+     */
+    public LoggerFactory(final ComponentLogBuffer logBuffer) {
+        this.logBuffer = logBuffer;
+    }
+
     /** {@inheritDoc} */
     @Override
     public String factoryPid() {
@@ -63,6 +75,6 @@ public final class LoggerFactory implements WireComponentFactory {
     @Override
     public WireComponent create(final String pid, final Map<String, Object> properties,
             final WireEmitContext emitContext) {
-        return new Logger(pid, properties);
+        return new Logger(pid, properties, this.logBuffer);
     }
 }

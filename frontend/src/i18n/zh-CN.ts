@@ -40,6 +40,7 @@ export default {
       none: '选中一个组件以编辑其配置',
       apply: '应用配置',
       invalid: '存在非法字段，无法应用',
+      applyBlockedSave: '组件配置存在非法字段，已取消保存',
       applySuccess: '配置已应用',
       noFields: '该组件没有可配置属性',
       assetTab: '资产配置',
@@ -51,6 +52,18 @@ export default {
       assetLoadFailed: '资产配置加载失败：{msg}',
       driverLoadFailed: 'Driver 配置加载失败：{msg}',
       driverApplySuccess: 'Driver 配置已应用',
+    },
+    logTail: {
+      title: '日志详情',
+      empty: '暂无日志，等待组件收到数据…',
+      clear: '清空',
+      hint: '仅保留最近 {max} 行',
+      state: {
+        live: '实时',
+        reconnecting: '重连中',
+        idle: '未连接',
+        stopped: '已停止',
+      },
     },
     /**
      * 组件目录文案：后端 GET /metadata 只返回英文 metatype 文案（name / description / options），
@@ -284,9 +297,10 @@ export default {
     },
     newAsset: {
       title: '创建新 Asset',
-      intro: '填写实例名（驱动由当前选中的 Driver 决定）。',
+      intro: '填写实例名并选择该资产所属的 Driver。',
       name: 'Asset 名称',
       driver: 'Driver 名称',
+      driverPlaceholder: '请选择 Driver',
       description: '资产描述',
     },
     actions: {
@@ -309,6 +323,7 @@ export default {
     validation: {
       required: '必填项',
       invalidPid: '必须是合法的 service.pid',
+      driverRequired: '请先选择该资产所属的 Driver',
       channelName: {
         empty: '通道名不能为空',
         invalidCharacters: '通道名不能包含以下字符： # / + , 与空格',

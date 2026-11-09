@@ -51,6 +51,8 @@ vi.mock('element-plus', () => ({
 import { i18n } from '@/i18n'
 import { useSnapshot } from '@/composables/useSnapshot'
 import { useWiresGraphStore } from '@/stores/wiresGraph'
+import { useComponentConfigStore } from '@/stores/componentConfig'
+import { useMetadataStore } from '@/stores/metadata'
 
 const TIMER_FACTORY_PID = 'org.eclipse.kura.wire.Timer'
 const GRAPH_SERVICE_PID = 'org.eclipse.kura.wire.graph.WireGraphService'
@@ -91,6 +93,47 @@ const timerConfig = (): ComponentConfigurationDto => ({
 
 const snapshotFile = (content: unknown): File =>
   new File([JSON.stringify(content)], 'snapshot.json', { type: 'application/json' })
+
+/** Timer 描述符：配置表单需要字段定义才能编辑 simple.interval */
+const timerDescriptor = (): ComponentDescriptor => ({
+  factoryPid: TIMER_FACTORY_PID,
+  name: 'Timer',
+  minInputPorts: 0,
+  maxInputPorts: 0,
+  defaultInputPorts: 0,
+  minOutputPorts: 0,
+  maxOutputPorts: 1,
+  defaultOutputPorts: 1,
+  inputPortNames: null,
+  outputPortNames: null,
+  properties: [
+    {
+      id: 'simple.interval',
+      name: 'simple.interval',
+      description: null,
+      type: 'INTEGER',
+      required: true,
+      defaultValue: '10',
+      cardinality: 0,
+      options: null,
+      min: '1',
+      max: null,
+    },
+  ],
+})
+
+/** 画布上已有一个 Timer（间隔 10 秒），描述符已就绪，可直接进配置表单 */
+function givenTimerOnCanvas(): void {
+  useMetadataStore().descriptors = [timerDescriptor()]
+  useWiresGraphStore().addComponent({
+    pid: 'Timer',
+    factoryPid: TIMER_FACTORY_PID,
+    inputPortCount: 0,
+    outputPortCount: 1,
+    position: { x: 0, y: 0 },
+    properties: { 'simple.interval': 10 },
+  })
+}
 
 describe('useSnapshot', () => {
   beforeEach(() => {
@@ -428,5 +471,31 @@ describe('useSnapshot', () => {
     expect(configs[1]?.properties[SERVICE_FACTORY_PID]?.value).toBe(TIMER_FACTORY_PID)
     expect(store.isDirty).toBe(false)
     expect(mocks.success).toHaveBeenCalled()
+  })
+
+  it('thenAppliesPendingConfigurationEditsBeforeSaving', async () => {
+    mocks.putSnapshot.mockResolvedValue(undefined)
+    givenTimerOnCanvas()
+    const config = useComponentConfigStore()
+    config.begin('Timer')
+    config.setValue('simple.interval', '2')
+
+    await api().save()
+
+    const configs = mocks.putSnapshot.mock.calls[0]?.[0] as ComponentConfigurationDto[]
+    const timer = configs.find((entry) => entry.pid === 'Timer')
+    expect(timer?.properties['simple.interval']?.value).toBe(2)
+  })
+
+  it('thenBlocksSaveWhenConfigurationFormIsInvalid', async () => {
+    givenTimerOnCanvas()
+    const config = useComponentConfigStore()
+    config.begin('Timer')
+    config.setValue('simple.interval', '0')
+
+    await api().save()
+
+    expect(mocks.putSnapshot).not.toHaveBeenCalled()
+    expect(mocks.error).toHaveBeenCalledWith(expect.stringContaining('非法'))
   })
 })

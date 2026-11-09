@@ -11,6 +11,9 @@ export default defineConfig({
     },
   },
   server: {
+    // 监听 0.0.0.0：默认只绑 localhost（本机 Node 解析为 ::1，局域网访问会被拒连）。
+    // 局域网/容器内访问 `http://<本机IP>:5173/` 需要此项；仅本机开发时无副作用。
+    host: true,
     port: 5173,
     proxy: {
       '/api': {

@@ -7,6 +7,7 @@ package com.kura.wires.rest.security;
 import java.io.IOException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kura.wires.rest.controller.SpaRoutes;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +27,7 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * 安全配置：/api/v1/wires/** 全部要求 {@code wires.admin} 角色（对照上游
  * {@code RolesAllowed(WIRES_ADMIN_ROLE)}），HTTP Basic、无状态会话、CSRF 关闭
- * （纯 API）；springdoc 端点放行。
+ * （纯 API）；springdoc 端点与前端静态产物（RFC 005，路由表见 {@link SpaRoutes}）放行。
  */
 @Configuration
 @EnableWebSecurity
@@ -46,7 +47,12 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**",
-                        "/swagger-ui.html").permitAll().anyRequest().authenticated())
+                        "/swagger-ui.html",
+                        // 桌面版前端由本服务托管（RFC 005）：入口页与构建产物必须匿名可读，
+                        // 否则 WebView 打开时会被 401 拦住；/api/** 仍要求 wires.admin 凭据。
+                        SpaRoutes.ROOT, "/index.html", "/favicon.ico", "/assets/**", SpaRoutes.WIRES,
+                        SpaRoutes.DRIVERS_ASSETS).permitAll()
+                        .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 .exceptionHandling(handling -> handling.authenticationEntryPoint((request, response, exception) -> writeError(
                         response, HttpStatus.UNAUTHORIZED, 401001, "未认证：请使用 HTTP Basic 提供 wires.admin 凭据"))

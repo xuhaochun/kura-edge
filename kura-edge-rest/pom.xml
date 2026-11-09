@@ -27,6 +27,13 @@
             <groupId>com.kura</groupId>
             <artifactId>kura-edge-components</artifactId>
         </dependency>
+        <!-- 驱动宿主（RFC 006）：只用来让 dependency-plugin 能解析到产物，provided 不进运行时 classpath，
+             最终以 target/driver-host/kura-edge-driver-host.jar 的 sidecar 形式随安装包分发 -->
+        <dependency>
+            <groupId>com.kura</groupId>
+            <artifactId>kura-edge-driver-host</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -81,9 +88,48 @@
 
     <build>
         <plugins>
+            <!-- 把 driver-host 的可执行 jar 放到 target/driver-host/，作为随应用分发的 sidecar
+                 （RFC 006 D7：DriverHostJarProvisioner 运行时复制到可写目录）。
+                 刻意不放 target/classes：JaCoCo 会把 classes 目录下的 jar 当归档分析，
+                 内嵌的 fat jar 与主程序同名 class 冲突，覆盖率报告会失败。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-driver-host</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.kura</groupId>
+                                    <artifactId>kura-edge-driver-host</artifactId>
+                                    <version>${project.version}</version>
+                                    <type>jar</type>
+                                    <outputDirectory>${project.build.directory}/driver-host</outputDirectory>
+                                    <destFileName>kura-edge-driver-host.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- driver-host 只作为 resources/driver-host/ 里的可执行 jar 使用，
+                         不能同时作为库出现在 BOOT-INF/lib（会重复打包 3.4MB，且没有必要） -->
+                    <excludes>
+                        <exclude>
+                            <groupId>com.kura</groupId>
+                            <artifactId>kura-edge-driver-host</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -94,4 +140,62 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- 桌面版（RFC 005）：把 frontend/dist 拷进 jar 的 static/，由后端同源托管前端。
+             只写 target/classes，不污染 src/main/resources；构建前须先跑 npm run build。 -->
+        <profile>
+            <id>desktop</id>
+            <build>
+                <plugins>
+                    <!-- copy-resources 只增不删：先清掉 target/classes/static，否则上一版前端指纹文件
+                         （index-<hash>.js 等）会残留在 jar 里，安装包体积与内容都跟着漂。 -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-clean-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>clean-frontend-static</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>clean</goal>
+                                </goals>
+                                <configuration>
+                                    <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                                    <filesets>
+                                        <fileset>
+                                            <directory>${project.build.outputDirectory}/static</directory>
+                                        </fileset>
+                                    </filesets>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-frontend-dist</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <overwrite>true</overwrite>
+                                    <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/../frontend/dist</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

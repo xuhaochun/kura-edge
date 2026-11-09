@@ -43,6 +43,10 @@ kura-edge/
 ├── kura-edge-rest/src/main/resources/
 │   ├── application.yml
 │   └── db/migration/                    # Flyway 脚本 V1__init.sql 起
+├── desktop/                             # 桌面外壳（RFC 005）：Tauri 2 工程 + 打包脚本
+│   ├── package.json                     # 只装 @tauri-apps/cli；npm run build:exe
+│   ├── scripts/                         # build-desktop.sh（一键打包）、fetch-windows-jre.sh
+│   └── src-tauri/                       # Cargo.toml、tauri.conf.json、src/main.rs（拉起内嵌 JRE）
 └── frontend/
     ├── package.json  vite.config.ts
     └── src/
