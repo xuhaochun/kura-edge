@@ -14,6 +14,7 @@ vi.mock('@vue-flow/core', () => ({
 }))
 
 const { useWiresGraphStore } = await import('@/stores/wiresGraph')
+const { useMetadataStore } = await import('@/stores/metadata')
 const WireComponentNode = (await import('@/components/wires/WireComponentNode.vue')).default
 const { i18n } = await import('@/i18n')
 
@@ -50,6 +51,34 @@ describe('WireComponentNode', () => {
   it('thenShowsChineseLabelFromMetadataText', () => {
     const wrapper = mountNode()
     expect(wrapper.find('.wire-node__label').text()).toBe('定时器')
+  })
+
+  it('thenShowsAssetNameForWireAssetNode', () => {
+    // 真实环境里 WireAsset 有组件定义（descriptor.name = WireAsset，且无中文名可查），
+    // 资产节点必须显示资产名（= 组件 PID）而不是工厂名
+    useMetadataStore().descriptors = [
+      {
+        factoryPid: 'org.eclipse.kura.wire.WireAsset',
+        name: 'WireAsset',
+        minInputPorts: 0,
+        maxInputPorts: 1,
+        defaultInputPorts: 0,
+        minOutputPorts: 0,
+        maxOutputPorts: 1,
+        defaultOutputPorts: 0,
+        properties: [],
+      },
+    ]
+    const wrapper = mountNode({
+      id: 'boiler',
+      data: {
+        pid: 'boiler',
+        factoryPid: 'org.eclipse.kura.wire.WireAsset',
+        inputPortCount: 0,
+        outputPortCount: 1,
+      },
+    })
+    expect(wrapper.find('.wire-node__label').text()).toBe('boiler')
   })
 
   it('thenHighlightsWhenSelected', () => {

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * Wires 图编辑器页（布局偏离上游 WiresPanelUi 的左右三栏：去掉左侧组件面板列，画布独占其余宽度）：
- * 工具栏（保存/重新加载/删除整图/导出/导入/缩放/删除组件）+ 画布；
+ * 工具栏只留「保存」（重新加载/删除整图/导出/导入/缩放/删除组件等按钮已按需求移除）+ 画布；
  * 右侧一列 = 「组件面板」（组件定义 / 资产清单，点击或拖到画布新建）+「组件配置」（选中组件的属性表单）；
  * 未选中组件时只显示组件面板（对照上游 configurationRow 默认隐藏、选中才出现）。
  * 未保存变更离开提示（onBeforeRouteLeave + beforeunload）。
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -27,17 +27,7 @@ interface Position {
 const store = useWiresGraphStore()
 const metadata = useMetadataStore()
 const { t } = useI18n()
-const { loading, saving, load, save, deleteAll, exportJson, importJson, createComponent } =
-  useSnapshot()
-
-const composerRef = ref<InstanceType<typeof WiresComposer> | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-
-function confirmThen(messageKey: string, action: () => void): void {
-  ElMessageBox.confirm(t(messageKey), t('app.title'), { type: 'warning' })
-    .then(() => action())
-    .catch(() => undefined)
-}
+const { saving, load, save, createComponent } = useSnapshot()
 
 /** 面板点击新建：位置按现有组件数错开（store 内部再做网格吸附） */
 function onPaletteCreate(payload: { descriptor: ComponentDescriptor; pid?: string }): void {
@@ -75,23 +65,6 @@ async function addNode(
     return
   }
   await createComponent(descriptor, position, pid)
-}
-
-function onDeleteComponent(): void {
-  const pid = store.selectedPid
-  if (!pid) {
-    return
-  }
-  confirmThen('wires.dialog.confirmDeleteComponent', () => store.removeComponent(pid))
-}
-
-function onImportFile(event: Event): void {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (file) {
-    void importJson(file)
-  }
 }
 
 function onBeforeUnload(event: BeforeUnloadEvent): void {
@@ -136,51 +109,10 @@ onBeforeRouteLeave(async () => {
       >
         {{ $t('wires.toolbar.save') }}
       </el-button>
-      <el-button
-        size="small"
-        :loading="loading"
-        @click="confirmThen('wires.dialog.confirmReset', () => load())"
-      >
-        {{ $t('wires.toolbar.reload') }}
-      </el-button>
-      <el-button size="small" @click="exportJson()">{{ $t('wires.toolbar.download') }}</el-button>
-      <el-button size="small" @click="fileInputRef?.click()">
-        {{ $t('wires.toolbar.importJson') }}
-      </el-button>
-      <el-button
-        type="danger"
-        size="small"
-        plain
-        @click="confirmThen('wires.dialog.confirmDeleteGraph', () => deleteAll())"
-      >
-        {{ $t('wires.toolbar.deleteGraph') }}
-      </el-button>
-      <el-button
-        type="danger"
-        size="small"
-        plain
-        :disabled="!store.selectedPid"
-        @click="onDeleteComponent"
-      >
-        {{ $t('wires.toolbar.deleteComponent') }}
-      </el-button>
-      <span class="wires-page__spacer" />
-      <el-button size="small" @click="composerRef?.zoomOut()">－</el-button>
-      <el-button size="small" @click="composerRef?.zoomIn()">＋</el-button>
-      <el-button size="small" @click="composerRef?.fitView()">
-        {{ $t('wires.toolbar.zoomFit') }}
-      </el-button>
-      <input
-        ref="fileInputRef"
-        class="wires-page__file-input"
-        type="file"
-        accept="application/json,.json"
-        @change="onImportFile"
-      />
     </header>
     <div class="wires-page__body">
       <main class="wires-page__canvas">
-        <WiresComposer ref="composerRef" @create="onDropCreate" />
+        <WiresComposer @create="onDropCreate" />
       </main>
       <aside class="wires-page__right">
         <!-- 未选中组件时右栏只留组件面板（对着上游 configurationRow 默认隐藏的行为），面板可占满整列 -->
@@ -213,14 +145,6 @@ onBeforeRouteLeave(async () => {
   padding: 8px 16px;
   border-bottom: 1px solid #dcdfe6;
   background: #fff;
-}
-
-.wires-page__spacer {
-  flex: 1;
-}
-
-.wires-page__file-input {
-  display: none;
 }
 
 .wires-page__body {

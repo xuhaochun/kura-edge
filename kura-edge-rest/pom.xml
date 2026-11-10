@@ -27,13 +27,6 @@
             <groupId>com.kura</groupId>
             <artifactId>kura-edge-components</artifactId>
         </dependency>
-        <!-- 驱动宿主（RFC 006）：只用来让 dependency-plugin 能解析到产物，provided 不进运行时 classpath，
-             最终以 target/driver-host/kura-edge-driver-host.jar 的 sidecar 形式随安装包分发 -->
-        <dependency>
-            <groupId>com.kura</groupId>
-            <artifactId>kura-edge-driver-host</artifactId>
-            <scope>provided</scope>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -53,6 +46,16 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
+            <!-- 必须显式写版本：导入的 spring-boot-dependencies BOM 里的 ${flyway.version} 在
+                 BOM 内部就已经解析定死（10.10.0），在本项目 properties 里改同名属性覆盖不了它。 -->
+            <version>${flyway.version}</version>
+        </dependency>
+        <!-- Flyway 10+ 把各数据库方言拆成独立模块，PostgreSQL 必须显式带上，否则
+             "No Flyway Database plugin found"（本项目默认库就是 PG，缺了直接起不来）。 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <version>${flyway.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
@@ -88,48 +91,9 @@
 
     <build>
         <plugins>
-            <!-- 把 driver-host 的可执行 jar 放到 target/driver-host/，作为随应用分发的 sidecar
-                 （RFC 006 D7：DriverHostJarProvisioner 运行时复制到可写目录）。
-                 刻意不放 target/classes：JaCoCo 会把 classes 目录下的 jar 当归档分析，
-                 内嵌的 fat jar 与主程序同名 class 冲突，覆盖率报告会失败。 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>copy-driver-host</id>
-                        <phase>process-classes</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>com.kura</groupId>
-                                    <artifactId>kura-edge-driver-host</artifactId>
-                                    <version>${project.version}</version>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/driver-host</outputDirectory>
-                                    <destFileName>kura-edge-driver-host.jar</destFileName>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <!-- driver-host 只作为 resources/driver-host/ 里的可执行 jar 使用，
-                         不能同时作为库出现在 BOOT-INF/lib（会重复打包 3.4MB，且没有必要） -->
-                    <excludes>
-                        <exclude>
-                            <groupId>com.kura</groupId>
-                            <artifactId>kura-edge-driver-host</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
                 <executions>
                     <execution>
                         <goals>

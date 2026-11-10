@@ -27,9 +27,12 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import com.kura.wires.core.config.ComponentConfigurationService;
+import com.kura.wires.core.ha.GraphLeadershipGrantedEvent;
+import com.kura.wires.core.ha.GraphLeadershipRevokedEvent;
 import com.kura.wires.core.registry.WireComponentRegistry;
 import com.kura.wires.core.registry.WireComponentRegistryListener;
 import com.kura.wires.core.snapshot.GraphJsonCodec;
@@ -239,6 +242,59 @@ public class WireGraphEngine implements WireGraphService {
      */
     public DeliveryStats getDeliveryStats() {
         return this.deliveryDispatcher.stats();
+    }
+
+    /**
+     * 取得图执行权后按持久化快照恢复整图：重建组件实例（定时器等自驱动组件随之重新排程）并恢复连线。
+     * <p>
+     * 对照上游依赖 OSGi 声明式服务自动激活组件的语义：库里有图，重启后组件实例与
+     * tick 排程都必须重新建立，否则图在界面上还在、实例却一个都没有，表现为「保存并重启后
+     * 定时器不工作」。
+     * <p>
+     * 触发时机是 {@link GraphLeadershipGrantedEvent} 而不是 {@code ApplicationReadyEvent}：蓝绿热更新时
+     * 新实例会先以 standby 起来（HTTP 就绪但**不跑图**），等旧实例交出执行权后才由该事件接管线图；
+     * 单机（H2）模式下 {@code GraphLeadership} 在 ready 阶段就抢到租约，时序与以前完全一致。
+     * 用"就绪后"而不是构造器 {@code @PostConstruct}：资产与驱动组件在各自的 {@code @PostConstruct}
+     * 里创建实例，恢复必须排在其后，避免两处抢同一 pid 的顺序。
+     */
+    @EventListener(GraphLeadershipGrantedEvent.class)
+    public synchronized void restoreGraph() {
+        final WireGraphConfiguration graph = loadGraph();
+        for (final WireComponentConfiguration component : graph.getWireComponentConfigurations()) {
+            final String pid = component.getConfiguration().getPid();
+            if (this.registry.getInstance(pid).isPresent()) {
+                // 已由资产/驱动服务恢复过的实例：跳过，保证本方法可重入
+                continue;
+            }
+            final Optional<String> factoryPid = findFactoryPid(component);
+            if (factoryPid.isEmpty()) {
+                log.warn("Skipping restore of wire component {} : no factory pid in its configuration", pid);
+                continue;
+            }
+            try {
+                this.registry.createInstance(pid, factoryPid.get(), instanceProperties(component, factoryPid.get()));
+            } catch (final RuntimeException e) {
+                // 单个组件恢复失败不阻断整图：其余组件照常恢复，故障组件留日志
+                log.error("Failed to restore wire component {}", pid, e);
+            }
+        }
+        refreshRoutes();
+        if (!graph.getWireComponentConfigurations().isEmpty()) {
+            log.info("Wire graph restored from snapshot: {} component(s), {} wire(s)",
+                    graph.getWireComponentConfigurations().size(), graph.getWireConfigurations().size());
+        }
+    }
+
+    /**
+     * 停止图执行（失去执行权或蓝绿移交前调用）：取消所有 tick，不再有定时器/驱动采集往图里送数据。
+     * <p>
+     * 只停排程、不销毁组件实例：如果只是短暂失去执行权（数据库闪断），重新抢到锁后
+     * {@link #restoreGraph()} 会看到实例还在并直接复用；真正退出的场景由容器关闭流程统一销毁。
+     */
+    @EventListener(GraphLeadershipRevokedEvent.class)
+    public synchronized void pauseGraph() {
+        this.tickScheduler.cancelAll();
+        log.info("Wire graph paused: 本进程已失去图执行权，tick 全部取消");
     }
 
     @Override

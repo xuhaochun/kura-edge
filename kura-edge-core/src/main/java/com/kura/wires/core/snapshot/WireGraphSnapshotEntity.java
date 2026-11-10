@@ -26,7 +26,12 @@ public class WireGraphSnapshotEntity {
     @Column(name = "service_pid", nullable = false, length = 255)
     private String servicePid;
 
-    /** 整图 JSON（字段名与上游快照一致） */
+    /**
+     * 整图 JSON（字段名与上游快照一致）。
+     * <p>
+     * {@code @Lob} 在 PG 上默认落成 {@code oid} 大对象，这里靠 {@code KuraPostgresDialect} 映射成
+     * {@code text}；H2 仍是 CLOB（RFC 007）。
+     */
     @Lob
     @Column(name = "graph_json", nullable = false)
     private String graphJson;

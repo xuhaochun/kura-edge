@@ -9,12 +9,16 @@
  * 切菜单前若页面有未保存改动，由页面自己通过 `beforeRouteLeave` 拦截（与上游 confirmIfUiDirty 等价），
  * 外壳只负责布局与当前项高亮。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import UpgradeDialog from '@/components/system/UpgradeDialog.vue'
 
 const route = useRoute()
 const { t } = useI18n()
+
+/** 升级弹窗开关（标题栏右侧「升级」按钮，RFC 006/007 的后端 jar 热更新入口） */
+const upgradeOpen = ref(false)
 
 /** 当前高亮的菜单路径（子路由归到所属一级菜单） */
 const activePath = computed(() =>
@@ -30,7 +34,19 @@ const activeTitle = computed(() =>
 <template>
   <div class="app-shell">
     <aside class="app-shell__sidenav">
-      <div class="app-shell__brand">{{ $t('app.brand') }}</div>
+      <div class="app-shell__brand">
+        <span class="app-shell__brand-text">{{ $t('app.brand') }}</span>
+        <el-button
+          class="app-shell__upgrade"
+          text
+          type="primary"
+          size="small"
+          :title="$t('app.upgrade.buttonHint')"
+          @click="upgradeOpen = true"
+        >
+          {{ $t('app.upgrade.button') }}
+        </el-button>
+      </div>
       <el-menu :default-active="activePath" router class="app-shell__menu">
         <el-menu-item index="/wires">
           <span class="app-shell__icon" aria-hidden="true">
@@ -70,6 +86,7 @@ const activeTitle = computed(() =>
         <router-view />
       </section>
     </div>
+    <UpgradeDialog v-model="upgradeOpen" />
   </div>
 </template>
 
@@ -94,11 +111,26 @@ const activeTitle = computed(() =>
   height: 48px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 0 16px;
   font-size: 15px;
   font-weight: 600;
   color: #303133;
   border-bottom: 1px solid #ebeef5;
+}
+
+.app-shell__brand-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 升级按钮贴在品牌名右侧：设备运维最主要的动作，放顶部比塞进菜单更好找 */
+.app-shell__upgrade {
+  flex-shrink: 0;
+  font-weight: 500;
+  padding: 4px 6px;
 }
 
 .app-shell__menu {

@@ -1,7 +1,7 @@
 # Drivers and Assets：领域模型、生命周期与 REST 契约
 
 > 目标读者：想知道「资产是什么、什么时候被创建、值和配置存在哪、界面点一下会发什么请求」的人。
-> 实现依据是 RFC 002（`.claude/.change/rfc/002-drivers-and-assets.md`）；对照的上游源码位置见各节括注。
+> 实现依据是 RFC 002（`change/rfc/002-drivers-and-assets.md`）；对照的上游源码位置见各节括注。
 
 ---
 

@@ -1,0 +1,40 @@
+<component name="ProjectRunConfigurationManager">
+  <!--
+    发布服务器的一键运行配置（RFC 009）。
+    刻意用 Maven 目标而不是 Application 配置：Application 配置必须绑定到一个已导入的 IDEA 模块，
+    而新模块在 Maven 重新导入之前并不存在于项目模型里（这正是"右键没有 Run"的原因）。
+    Maven 配置只依赖 pom，重导入前后都能跑。
+
+    -f 指定模块的 pom，避免在聚合根上执行 spring-boot:run（根模块没有 main class，会报
+    "Unable to find a suitable main class"）。
+  -->
+  <configuration default="false" name="release-server (8081)" type="MavenRunConfiguration" factoryName="Maven">
+    <MavenSettings>
+      <option name="myGeneralSettings" />
+      <option name="myRunnerSettings" />
+      <option name="myRunnerParameters">
+        <MavenRunnerParameters>
+          <option name="cmdOptions" value="-o -f kura-edge-release-server/pom.xml" />
+          <option name="profiles">
+            <set />
+          </option>
+          <option name="goals">
+            <list>
+              <option value="spring-boot:run" />
+            </list>
+          </option>
+          <option name="pomFileName" />
+          <option name="profilesMap">
+            <map />
+          </option>
+          <option name="projectsCmdOptionValues">
+            <list />
+          </option>
+          <option name="resolveToWorkspace" value="false" />
+          <option name="workingDirPath" value="$PROJECT_DIR$" />
+        </MavenRunnerParameters>
+      </option>
+    </MavenSettings>
+    <method v="2" />
+  </configuration>
+</component>

@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import com.kura.wires.engine.DriverFactory;
 import com.kura.wires.model.definition.Ad;
 import com.kura.wires.model.definition.Ocd;
 import com.kura.wires.model.driver.Driver;
@@ -111,18 +110,4 @@ public interface DriverService {
      * 按数据库里既有的配置重建全部驱动实例（启动时调用）。
      */
     void reloadAll();
-
-    /**
-     * 运行时注册驱动工厂（RFC 006：由驱动宿主进程提供，同名覆盖）。
-     *
-     * @param factory 驱动工厂
-     */
-    void registerFactory(DriverFactory factory);
-
-    /**
-     * 注销驱动工厂，并销毁由它创建的实例。
-     *
-     * @param factoryPid 工厂 PID
-     */
-    void unregisterFactory(String factoryPid);
 }

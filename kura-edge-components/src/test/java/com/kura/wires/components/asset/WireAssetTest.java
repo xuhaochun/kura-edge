@@ -283,16 +283,6 @@ public class WireAssetTest {
         public void reloadAll() {
             // 测试桩无需恢复
         }
-
-        @Override
-        public void registerFactory(final com.kura.wires.engine.DriverFactory factory) {
-            // 测试桩无需注册
-        }
-
-        @Override
-        public void unregisterFactory(final String factoryPid) {
-            // 测试桩无需注销
-        }
     }
 
     /** 可配置的驱动桩 */

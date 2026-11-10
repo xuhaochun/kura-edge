@@ -29,7 +29,13 @@ public class ComponentConfigurationEntity {
     @Column(name = "factory_pid", nullable = false, length = 255)
     private String factoryPid;
 
-    /** 配置属性 JSON（属性名与上游快照一致） */
+    /**
+     * 配置属性 JSON（属性名与上游快照一致）。
+     * <p>
+     * {@code @Lob} 原生态在 PostgreSQL 上是 {@code oid} 大对象，不适合当配置存储；由
+     * {@code KuraPostgresDialect} 把 CLOB 改映射成 {@code text}，H2 仍是 CLOB，两套迁移脚本各自匹配
+     * （RFC 007）。
+     */
     @Lob
     @Column(name = "properties_json", nullable = false)
     private String propertiesJson;

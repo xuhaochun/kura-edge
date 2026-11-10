@@ -34,8 +34,14 @@ public enum ErrorCode {
     PERSISTENCE_ERROR("500002", 500),
     /** 通道 IO / 驱动调用失败（资产读写） */
     CHANNEL_IO_FAILED("500003", 500),
-    /** 驱动宿主进程不可用 / 重载失败（RFC 006） */
-    DRIVER_HOST_UNAVAILABLE("503001", 503);
+    /** 更新包下载失败（RFC 006） */
+    UPDATE_DOWNLOAD_FAILED("500004", 500),
+    /** 非桌面运行时，不能热更新（RFC 006） */
+    UPDATE_UNSUPPORTED("409004", 409),
+    /** 已有更新在进行（RFC 006） */
+    UPDATE_IN_PROGRESS("409005", 409),
+    /** 更新包非法：版本号/URL/sha256 不合规（RFC 006） */
+    UPDATE_REQUEST_INVALID("400004", 400);
 
     private final String code;
     private final int httpStatus;

@@ -48,19 +48,9 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule controllersOnlyLiveInRestControllerPackage = classes()
             .that().areAnnotatedWith(RestController.class)
-            .should().resideInAPackage("com.kura.wires.rest.controller..");
-
-    @ArchTest
-    static final ArchRule driverHostStaysOutOfTheApplication = noClasses()
-            .that().resideInAPackage("com.kura.wires.driverhost..")
-            .should().dependOnClassesThat()
-            .resideInAnyPackage("com.kura.wires.core..", "com.kura.wires.rest..", "com.kura.wires.components..");
-
-    @ArchTest
-    static final ArchRule remoteDriverAdapterStaysInCore = noClasses()
-            .that().resideInAPackage("com.kura.wires.core.driver.remote..")
-            .should().dependOnClassesThat()
-            .resideInAnyPackage("com.kura.wires.rest..", "com.kura.wires.components..");
+            // 发布服务器（kura-edge-release-server，RFC 009）是唯一允许的第二个 Controller 宿主：
+            // 它不依赖 core/components/rest，只对外提供 jar 与 feed.json，与业务分层无关。
+            .should().resideInAnyPackage("com.kura.wires.rest.controller..", "com.kura.wires.release..");
 
     @ArchTest
     static final ArchRule restMustNotTouchRepositoriesDirectly = noClasses()

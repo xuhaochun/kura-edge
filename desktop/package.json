@@ -1,0 +1,17 @@
+{
+  "name": "kura-edge-desktop",
+  "private": true,
+  "version": "1.0.5",
+  "type": "module",
+  "description": "kura-edge 桌面外壳：Tauri 2 窗口 + 内嵌 JRE 17 启动 Spring Boot 后端",
+  "scripts": {
+    "tauri": "tauri",
+    "build:exe": "bash scripts/build-desktop.sh",
+    "build:jar": "bash scripts/build-desktop.sh --jar-only",
+    "fetch:jre": "bash scripts/fetch-windows-jre.sh",
+    "build:desktop": "bash scripts/build-desktop.sh"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4"
+  }
+}

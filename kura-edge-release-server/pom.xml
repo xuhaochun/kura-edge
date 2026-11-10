@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  kura-edge-release-server：发布服务器（RFC 009）。
+  只做一件事——把 releases/ 目录里的 kura-edge-<版本>.jar 通过 HTTP 暴露出去，并生成 feed.json。
+  刻意不依赖 core / components / rest：它是运维侧的一个静态文件服务，不该把整个应用拖进容器。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.kura</groupId>
+        <artifactId>kura-edge</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>kura-edge-release-server</artifactId>
+    <name>kura-edge-release-server</name>
+    <description>更新发布服务器：8081 端口提供 jar 下载与 feed.json 清单（RFC 009）</description>
+
+    <properties>
+        <!-- 与其它模块同档：这是纯胶水代码，测试能全覆盖，没必要放宽 -->
+        <jacoco.line.coverage.limit>0.80</jacoco.line.coverage.limit>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 只取更新协议的两个共享契约：VersionComparator（谁是最新版）与 FeedManifestDto（清单格式）。
+             api 模块只依赖 JDK，不会把 Spring 反向带进这个服务。 -->
+        <dependency>
+            <groupId>com.kura</groupId>
+            <artifactId>kura-edge-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,42 +1,85 @@
 # kura-edge 后端配置。密钥/口令只放占位符，由环境变量注入（Rules 05 §11）。
 server:
   port: 8080
+  # 热更新要让 JVM 收尾（连接池归还、图组件 stop）后再退出，见 RFC 006/007
+  shutdown: graceful
 
 spring:
   application:
     name: kura-edge
   datasource:
-    # 文件模式 H2：默认落盘到 ~/.kura-edge/data/kuraedge.mv.db（与驱动的 ~/.kura-edge/drivers 同级），
-    # 可用 KURA_EDGE_DATA_DIR 覆盖目录；AUTO_SERVER 允许 IDE 等第二个进程在运行时读同一个库。
-    # 测试用内存库覆盖，见 kura-edge-rest/src/test/resources/application.properties。
-    url: jdbc:h2:file:${KURA_EDGE_DATA_DIR:${user.home}/.kura-edge/data}/kuraedge;AUTO_SERVER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
+    # 默认 PostgreSQL：蓝绿热更新要求"新旧两个 JVM 共享同一份状态"，文件模式 H2 做不到（RFC 007）。
+    # 设备侧只需要能单向访问到数据库；口令务必用 KURA_EDGE_DB_PASSWORD 覆盖并定期轮换，
+    # 下面的默认值只是内网开箱即用的厂内口令，不属于对外发布凭据。
+    url: ${KURA_EDGE_DB_URL:jdbc:postgresql://192.168.31.40:15432/kuraedge}
+    driver-class-name: org.postgresql.Driver
+    username: ${KURA_EDGE_DB_USER:postgres}
+    password: ${KURA_EDGE_DB_PASSWORD:iot123...}
+    hikari:
+      # 连不上就尽快失败：桌面外壳据此显示错误页，而不是让用户对着窗口干等 30 s
+      connection-timeout: 10000
+      maximum-pool-size: 5
+      pool-name: kura-edge-pool
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    # @Lob 的 JSON 字段在 PG 上要落成 text（而不是 oid 大对象），见 KuraPostgresDialect
+    database-platform: com.kura.wires.rest.config.KuraPostgresDialect
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    # {vendor} 由 Flyway 解析成 h2 / postgresql：两套脚本只有列类型差异（CLOB vs TEXT），
+    # 各自固定、已上线的库不要改，否则 checksum 校验会失败。
+    locations: classpath:db/migration/{vendor}
   jackson:
     default-property-inclusion: non_null
 
 kura:
+  update:
+    # 桌面外壳（RFC 006）用环境变量传入的"暂存目录"与"app 目录"：
+    # staging/ 只有后端写，app/ 只有外壳写。两者缺失即"非桌面运行"，POST /api/v1/system/update 返回 409004。
+    staging-dir: ${KURA_EDGE_UPDATE_DIR:}
+    home-dir: ${KURA_EDGE_HOME:}
+    # 自动更新（RFC 008/010）：上位机只能单向访问服务器，所以由设备定时拉清单。
+    # 【首选】发布服务器地址（kura-edge-release-server）：配它就不用再记清单路径，
+    # 设备按 <地址>/feed.json 拉清单、按清单里的相对地址下 jar；"不给 url 直接升级"也走它。
+    release-server-url: ${KURA_RELEASE_SERVER_URL:http://192.168.31.21:8081}
+    # 【可选】显式清单地址：nginx/静态目录发版时用；留空则自动用 <release-server-url>/feed.json。
+    # 清单示例：{"protocol":1,"latest":{"version":"1.0.4","url":"kura-edge-1.0.4.jar","sha256":"…","size":60126433}}
+    feed-url: ${KURA_EDGE_UPDATE_FEED:}
+    # 轮询间隔（毫秒，最小 10s）与失败版本的重试冷却（毫秒，默认 30 分钟）
+    feed-interval-ms: ${KURA_EDGE_UPDATE_FEED_INTERVAL:30000}
+    retry-after-ms: ${KURA_EDGE_UPDATE_RETRY_AFTER:1800000}
+  bluegreen:
+    # 蓝绿热更新（RFC 007）：auto = 数据源是 PostgreSQL 就启用（新旧 JVM 共享 PG + 咨询锁选主），
+    # 文件 H2 单机模式自动降级为"就地重启"（同一个库文件不允许两个进程同时打开）。
+    enabled: ${KURA_EDGE_BLUEGREEN:auto}
   security:
     admin:
       username: admin
       # 仅占位符：生产环境必须通过 KURA_EDGE_ADMIN_PASSWORD 覆盖
       password: ${KURA_EDGE_ADMIN_PASSWORD:changeme}
-  driver:
-    host:
-      # auto：从 classes 目录运行且宿主类在 classpath 上（IDE / spring-boot:run）→ 同进程，便于断点调试；
-      # 打包成 fat jar 后宿主类不在 classpath 上 → 自动走独立进程（生产形态）。
-      # 也可显式写 process / in-process。
-      mode: auto
-      # debug-port: 5005     # 仅 process 模式：给子 JVM 开 JDWP，IDEA 用 Remote JVM Debug 连它
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+---
+# 单机/离线模式（--spring.profiles.active=h2）：文件模式 H2，桌面外壳在没有 PostgreSQL 时用它。
+# 此模式下蓝绿不可用：h2 文件库不允许两个 JVM 同时写，热更新退回"停旧起新"的就地重启。
+spring:
+  config:
+    activate:
+      on-profile: h2
+  datasource:
+    url: jdbc:h2:file:${KURA_EDGE_DATA_DIR:${user.home}/.kura-edge/data}/kuraedge;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    # 显式指定 H2 方言：默认文档里的 database-platform 是 PG 的，profile 不覆盖就会拿 PG 方言连 H2
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    locations: classpath:db/migration/h2

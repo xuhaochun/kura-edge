@@ -21,8 +21,10 @@
         <module>kura-edge-api</module>
         <module>kura-edge-core</module>
         <module>kura-edge-components</module>
-        <module>kura-edge-driver-host</module>
         <module>kura-edge-rest</module>
+        <!-- 发布服务器（RFC 009）：8081 提供 jar 下载与 feed.json，不参与业务装配。
+             放在最后只是为了和业务模块分开读，顺序不影响构建（Maven 自行解析模块间依赖）。 -->
+        <module>kura-edge-release-server</module>
     </modules>
 
     <properties>
@@ -32,6 +34,10 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <spring-boot.version>3.3.5</spring-boot.version>
+        <!-- Flyway 覆盖 Boot 3.3.5 默认的 10.10.0：10.x 不认识 PostgreSQL 18（服务端是 18.6），
+             启动即 "Unsupported Database: PostgreSQL 18.6"。11.20.3 支持 PG 18，且 API 与 Boot 3.3 的
+             FlywayAutoConfiguration 兼容（已验证能建表、能校验 checksum）。 -->
+        <flyway.version>11.20.3</flyway.version>
         <springdoc.version>2.6.0</springdoc.version>
         <archunit.version>1.3.0</archunit.version>
         <jacoco.version>0.8.12</jacoco.version>
@@ -70,11 +76,6 @@
             <dependency>
                 <groupId>com.kura</groupId>
                 <artifactId>kura-edge-components</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.kura</groupId>
-                <artifactId>kura-edge-driver-host</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

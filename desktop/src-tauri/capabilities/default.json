@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "kura-edge 主窗口所需的最小能力集：只用 core:default，不开放文件系统/Shell 等插件能力。",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

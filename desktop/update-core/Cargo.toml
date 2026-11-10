@@ -1,0 +1,12 @@
+[package]
+name = "kura-edge-update-core"
+version = "1.0.5"
+edition = "2021"
+rust-version = "1.77"
+description = "kura-edge 桌面外壳热更新的纯逻辑：清单解析、jar 校验、原子写与更新决策（RFC 006）"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

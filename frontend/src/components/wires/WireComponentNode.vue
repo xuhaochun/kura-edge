@@ -9,6 +9,7 @@ import PortHandle from './PortHandle.vue'
 import { useWiresGraphStore } from '@/stores/wiresGraph'
 import { useMetadataStore } from '@/stores/metadata'
 import { useMetadataText } from '@/composables/useMetadataText'
+import { WIRE_ASSET_FACTORY_PID } from '@/types/driversAssets'
 
 export interface WireComponentNodeData {
   pid: string
@@ -28,8 +29,17 @@ const metadata = useMetadataStore()
 const { t } = useI18n()
 const { componentLabel } = useMetadataText()
 
-/** 节点标题：i18n 中文组件名，未登记时回落后端名称，再退化为组件 pid */
+/** 资产节点：画布上展示资产名（= 组件 PID），对照上游 composer 以 component.pid 作节点标题 */
+const isAsset = computed(() => props.data.factoryPid === WIRE_ASSET_FACTORY_PID)
+
+/**
+ * 节点标题：资产显示资产名（PID），其余组件显示 i18n 中文组件名；
+ * 未登记翻译时回落后端名称，再退化为组件 pid。
+ */
 const label = computed(() => {
+  if (isAsset.value) {
+    return props.data.pid
+  }
   const descriptor = metadata.descriptorByFactoryPid[props.data.factoryPid] ?? null
   return componentLabel(props.data.factoryPid, metadata.labelOf(descriptor) || props.data.pid)
 })

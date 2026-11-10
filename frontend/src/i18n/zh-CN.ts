@@ -12,6 +12,34 @@ export default {
       driversAssets: 'Drivers and Assets',
     },
     title: 'Wires 图编辑器',
+    upgrade: {
+      button: '升级',
+      buttonHint: '热更新后端 jar（不用重装安装包）',
+      title: '升级后端',
+      url: '安装包地址（可选：留空表示用发布服务器上的最新版）',
+      urlPlaceholder: 'http://192.168.31.21:8081/kura-edge-1.0.4.jar',
+      urlHint: '一般不用填：直接点右下角「升级到最新版」，地址与 sha256 都由发布服务器清单给出。',
+      invalidUrl: '必须是 http:// 或 https:// 开头的地址',
+      sha256: 'SHA-256（可选）',
+      sha256Placeholder: '64 位十六进制，留空则不校验',
+      invalidSha256: '必须是 64 位十六进制',
+      version: '版本号（可选）',
+      versionPlaceholder: '如 1.0.4，留空则从文件名推导',
+      current: '当前版本 {version}（{role}）',
+      singleInstanceHint:
+        '当前是单机模式（文件数据库）：升级期间后端会重启，页面会中断 15~25 秒。改用 PostgreSQL 可零中断切换。',
+      submit: '开始升级',
+      acceptedTitle: '已受理，正在更新',
+      acceptedHint:
+        '后端正在下载并校验新 jar；换 jar 与重启由桌面外壳完成，就绪后页面会自动刷新。更新期间图执行会短暂中断。',
+      failedTitle: '升级失败',
+      feedOn:
+        '自动更新：已开启，每 {minutes} 分钟检查一次；清单里最新是 {version}，上次检查 {checked}',
+      feedOff: '自动更新：未开启（没有配置发布服务器地址），只能在这里手动填网址升级',
+      source: '更新源：{url}',
+      upgradeToLatest: '升级到 {version}',
+      checkNow: '立即检查',
+    },
   },
   wires: {
     toolbar: {

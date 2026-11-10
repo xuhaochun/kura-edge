@@ -1,0 +1,22 @@
+[package]
+name = "kura-edge-desktop"
+version = "1.0.5"
+edition = "2021"
+rust-version = "1.77"
+description = "kura-edge 桌面外壳：拉起内嵌 JRE 中的 Spring Boot，再用 WebView 打开本地页面"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+rand = "0.9"
+# 热更新的纯逻辑（RFC 006）：解析清单、校验 jar、原子写、更新决策。
+# 单独一个 path crate，是为了让这部分在没有 webkit2gtk 的机器上也能 `cargo test`。
+kura-edge-update-core = { path = "../update-core" }
+
+[profile.release]
+strip = true
+opt-level = "s"
+codegen-units = 4

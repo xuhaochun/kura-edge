@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kura-edge</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f5f7fa;
+        color: #1f2937;
+      }
+      .card {
+        max-width: 720px;
+        margin: 24px;
+        padding: 28px 32px;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 12px 32px rgb(15 23 42 / 12%);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 20px;
+      }
+      p {
+        margin: 8px 0;
+        line-height: 1.6;
+        color: #475569;
+      }
+      pre {
+        margin: 12px 0 0;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        color: #b91c1c;
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-size: 13px;
+      }
+      .hidden {
+        display: none;
+      }
+      .spinner {
+        width: 18px;
+        height: 18px;
+        margin-right: 8px;
+        display: inline-block;
+        vertical-align: -3px;
+        border: 2px solid #cbd5e1;
+        border-top-color: #2563eb;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1 id="title"><span class="spinner"></span>正在启动 kura-edge…</h1>
+      <p id="hint">首次启动会解压内嵌运行时，通常需要 3~10 秒。</p>
+      <section id="error" class="hidden">
+        <h1 style="color: #b91c1c">后端启动失败</h1>
+        <pre id="detail"></pre>
+        <p>请关闭本窗口后重试；若持续失败，把上面的日志文件连同本提示一起反馈。</p>
+      </section>
+    </main>
+    <script>
+      // 由 Rust 侧通过 WebView 初始化脚本注入；页面加载后自检一次，覆盖“错误早于页面加载”的时序。
+      window.__kuraShowError = function (message) {
+        document.getElementById('title').classList.add('hidden')
+        document.getElementById('hint').classList.add('hidden')
+        var box = document.getElementById('error')
+        box.classList.remove('hidden')
+        document.getElementById('detail').textContent = message || '未知错误'
+      }
+      if (window.__KURA_EDGE_ERROR__) {
+        window.__kuraShowError(window.__KURA_EDGE_ERROR__)
+      }
+    </script>
+  </body>
+</html>

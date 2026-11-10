@@ -1,0 +1,2 @@
+# 发布目录：把 kura-edge-<版本>.jar 放进来（build-desktop.sh 会自动拷）。
+# .jar 不入库（见 .gitignore），只保留本占位文件。

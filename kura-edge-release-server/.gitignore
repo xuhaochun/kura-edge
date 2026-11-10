@@ -1,0 +1,4 @@
+# 发布物不入库：jar 是构建产物，进 git 会让仓库暴涨
+releases/*.jar
+releases/*.sha256
+target/

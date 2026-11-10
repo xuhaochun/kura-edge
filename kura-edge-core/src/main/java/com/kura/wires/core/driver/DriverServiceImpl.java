@@ -4,10 +4,10 @@
  ******************************************************************************/
 package com.kura.wires.core.driver;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +29,6 @@ import com.kura.wires.model.ComponentConfiguration;
 import com.kura.wires.model.WireGraphConstants;
 import com.kura.wires.model.definition.Ad;
 import com.kura.wires.model.definition.Ocd;
-import com.kura.wires.model.driver.ChannelDescriptors;
 import com.kura.wires.model.driver.Driver;
 
 /**
@@ -82,57 +81,12 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     public Collection<String> getDriverFactoryPids() {
-        this.lock.readLock().lock();
-        try {
-            return Collections.unmodifiableSet(new LinkedHashSet<>(this.factories.keySet()));
-        } finally {
-            this.lock.readLock().unlock();
-        }
+        return Collections.unmodifiableSet(this.factories.keySet());
     }
 
     @Override
     public boolean isDriverFactory(final String factoryPid) {
-        this.lock.readLock().lock();
-        try {
-            return factoryPid != null && this.factories.containsKey(factoryPid);
-        } finally {
-            this.lock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public void registerFactory(final DriverFactory factory) {
-        this.lock.writeLock().lock();
-        try {
-            final String pid = factory.factoryPid();
-            if (this.factories.put(pid, factory) != null) {
-                log.info("Replaced Driver factory {}", pid);
-            } else {
-                log.info("Registered Driver factory {}", pid);
-            }
-        } finally {
-            this.lock.writeLock().unlock();
-        }
-    }
-
-    @Override
-    public void unregisterFactory(final String factoryPid) {
-        this.lock.writeLock().lock();
-        try {
-            if (this.factories.remove(factoryPid) != null) {
-                log.info("Unregistered Driver factory {}", factoryPid);
-            }
-            this.instanceFactoryPids.entrySet().removeIf(entry -> {
-                if (factoryPid != null && factoryPid.equals(entry.getValue())) {
-                    this.instances.remove(entry.getKey());
-                    log.info("Destroyed Driver instance {} of unregistered factory {}", entry.getKey(), factoryPid);
-                    return true;
-                }
-                return false;
-            });
-        } finally {
-            this.lock.writeLock().unlock();
-        }
+        return factoryPid != null && this.factories.containsKey(factoryPid);
     }
 
     @Override
@@ -142,8 +96,20 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     public List<Ad> getChannelDescriptor(final String factoryPid) {
-        return findFactory(factoryPid).map(factory -> ChannelDescriptors.toAds(factory.getChannelDescriptor()))
-                .orElseGet(List::of);
+        return findFactory(factoryPid).map(factory -> {
+            final Object descriptor = factory.getChannelDescriptor() == null ? null
+                    : factory.getChannelDescriptor().getDescriptor();
+            if (!(descriptor instanceof final List<?> list)) {
+                return List.<Ad>of();
+            }
+            final List<Ad> ads = new ArrayList<>();
+            for (final Object item : list) {
+                if (item instanceof final Ad ad) {
+                    ads.add(ad);
+                }
+            }
+            return ads;
+        }).orElseGet(List::of);
     }
 
     @Override
@@ -229,7 +195,6 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     public void reloadAll() {
-        destroyAllInstances();
         for (final ComponentConfiguration config : this.configurationService.getConfigurations()) {
             final String factoryPid = factoryPidOf(config);
             if (factoryPid == null || !isDriverFactory(factoryPid)) {
@@ -281,28 +246,7 @@ public class DriverServiceImpl implements DriverService {
         }
     }
 
-    /**
-     * 释放全部实例，供重载/热更新重建（RFC 006）。
-     */
-    private void destroyAllInstances() {
-        this.lock.writeLock().lock();
-        try {
-            this.instances.clear();
-            this.instanceFactoryPids.clear();
-        } finally {
-            this.lock.writeLock().unlock();
-        }
-    }
-
     private Optional<DriverFactory> findFactory(final String factoryPid) {
-        if (factoryPid == null) {
-            return Optional.empty();
-        }
-        this.lock.readLock().lock();
-        try {
-            return Optional.ofNullable(this.factories.get(factoryPid));
-        } finally {
-            this.lock.readLock().unlock();
-        }
+        return factoryPid == null ? Optional.empty() : Optional.ofNullable(this.factories.get(factoryPid));
     }
 }

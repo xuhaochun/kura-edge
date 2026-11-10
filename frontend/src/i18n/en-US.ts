@@ -12,6 +12,34 @@ export default {
       driversAssets: 'Drivers and Assets',
     },
     title: 'Wires Graph Editor',
+    upgrade: {
+      button: 'Upgrade',
+      buttonHint: 'Hot-update the backend jar (no reinstall needed)',
+      title: 'Upgrade backend',
+      url: 'Package URL (optional: empty means the latest on the release server)',
+      urlPlaceholder: 'http://192.168.31.40:8000/kura-edge-1.0.4.jar',
+      urlHint:
+        'Point at kura-edge-<version>.jar; the two fields below are filled in automatically when empty.',
+      invalidUrl: 'Must start with http:// or https://',
+      sha256: 'SHA-256 (optional)',
+      sha256Placeholder: '64 hex chars, empty means skip verification',
+      invalidSha256: 'Must be 64 hex chars',
+      version: 'Version (optional)',
+      versionPlaceholder: 'e.g. 1.0.4, derived from the file name when empty',
+      current: 'Current {version} ({role})',
+      singleInstanceHint:
+        'Single-instance mode (file database): the backend restarts during the upgrade and the page is down for 15-25 s. PostgreSQL gives a zero-downtime switch.',
+      submit: 'Start upgrade',
+      acceptedTitle: 'Accepted, updating',
+      acceptedHint:
+        'The backend is downloading and verifying the jar; the desktop shell swaps it and restarts. The page reloads by itself once ready.',
+      failedTitle: 'Upgrade failed',
+      feedOn:
+        'Auto-update: on, checks every {minutes} min; feed offers {version}, last checked {checked}',
+      feedOff:
+        'Auto-update: off (no feed URL configured) — enter a package URL to upgrade manually',
+      checkNow: 'Check now',
+    },
   },
   wires: {
     toolbar: {

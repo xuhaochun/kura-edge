@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.kura.wires.core.driver.DriverService;
-import com.kura.wires.engine.DriverFactory;
 import com.kura.wires.model.definition.Ad;
 import com.kura.wires.model.definition.Ocd;
 import com.kura.wires.model.driver.Driver;
@@ -112,15 +111,5 @@ public final class StubDriverService implements DriverService {
     @Override
     public void reloadAll() {
         // 测试桩无需恢复
-    }
-
-    @Override
-    public void registerFactory(final DriverFactory factory) {
-        this.descriptors.put(factory.factoryPid(), List.of());
-    }
-
-    @Override
-    public void unregisterFactory(final String factoryPid) {
-        this.descriptors.remove(factoryPid);
     }
 }

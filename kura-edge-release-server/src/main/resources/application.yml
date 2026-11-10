@@ -1,0 +1,29 @@
+# 发布服务器配置（RFC 009）
+server:
+  # 现场约定的端口：设备侧 KURA_EDGE_UPDATE_FEED 就指向这里
+  port: 8081
+  address: 0.0.0.0
+
+spring:
+  application:
+    name: kura-edge-release-server
+  # 与主服务一致：清单里省略 notes 之类的空字段，设备端就不必处理 null
+  jackson:
+    default-property-inclusion: non_null
+  # 首页是手写 HTML，不需要模板引擎；jar 下载走流式，不需要 multipart
+  mvc:
+    problemdetails:
+      enabled: false
+
+kura:
+  release:
+    # jar 所在目录。相对路径先按进程工作目录找，找不到回退到模块根——IDEA 里 Run（工作目录是仓库根）
+    # 与 java -jar target/x.jar（工作目录是模块根）都能扫到 kura-edge-release-server/releases/。
+    # build-desktop.sh 会直接把新 jar 拷进来。
+    dir: ${KURA_RELEASE_DIR:releases}
+    # 对外可达的基地址，只用于首页示例文案（设备拿的是相对地址，服务器换 IP 不用改清单）
+    base-url: ${KURA_RELEASE_BASE_URL:}
+
+logging:
+  level:
+    root: info
